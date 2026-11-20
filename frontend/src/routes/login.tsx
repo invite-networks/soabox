@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { History, KeyRound, LogIn, ShieldCheck } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -123,33 +123,6 @@ function LoginPage() {
         />
         <div className="relative text-white">
           <Logo size={32} />
-        </div>
-        <div className="relative flex max-w-md flex-col gap-8">
-          <div className="flex flex-col gap-3">
-            <p className="text-3xl leading-tight font-semibold tracking-tight text-white">
-              Authoritative DNS, managed with confidence.
-            </p>
-            <p className="text-sidebar-muted">
-              A web console and drop-in PowerDNS API for teams that run their own zones.
-            </p>
-          </div>
-          <ul className="flex flex-col gap-4 text-sm">
-            {[
-              { icon: KeyRound, title: "PowerDNS compatible API", text: "Existing tools and scripts keep working." },
-              { icon: ShieldCheck, title: "Per-zone access control", text: "Roles, accounts, and scoped API keys." },
-              { icon: History, title: "Complete audit history", text: "Every change, by whom, with a diff." },
-            ].map((item) => (
-              <li key={item.title} className="flex gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/10">
-                  <item.icon aria-hidden className="size-4 text-sidebar-accent" />
-                </span>
-                <span>
-                  <span className="block font-medium text-white">{item.title}</span>
-                  <span className="text-sidebar-muted">{item.text}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
         <p className="relative text-xs text-sidebar-muted">SOAbox {APP_VERSION}. Open source under Apache-2.0.</p>
       </section>
