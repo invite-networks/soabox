@@ -5,8 +5,8 @@ name: soabox
 
 services:
   soabox:
-    # Pin the release digest, for example ghcr.io/invite-networks/soabox:0.1.0@sha256:...
-    image: ghcr.io/invite-networks/soabox:0.1.0
+    # Pin the release digest, for example ghcr.io/invite-networks/soabox:0.2.0@sha256:...
+    image: ghcr.io/invite-networks/soabox:0.2.0
     env_file: .env
     environment:
       SOABOX_MODE: prod
