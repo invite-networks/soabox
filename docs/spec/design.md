@@ -21,7 +21,7 @@ Design goals:
 |---|---|---|
 | HTTP layer | Axum router, client IP resolution, security headers, request limits, tracing spans. | NFR-SEC-03, NFR-SEC-05 |
 | Passthrough (`/api`) | Key authentication, route classification, scope enforcement, list filtering, forwarding. | FR-API-*, FR-KEY-*, FR-SCP-* |
-| UI API (`/v1`) | Typed JSON endpoints for the UI, sessions, CSRF, OpenAPI via `utoipa`. | FR-UI-*, FR-RBAC-* |
+| UI API (`/v1`) | Typed JSON endpoints for the UI, sessions, CSRF, OpenAPI via `utoipa`. The contract is [v1-api.md](v1-api.md). | FR-UI-*, FR-RBAC-* |
 | Auth (`/auth`) | Local sign-in, TOTP, OIDC flow, sessions. | FR-AUTH-* |
 | Authorization core | Decides whether an actor may perform an operation on a zone or server resource. | FR-RBAC-*, FR-SCP-* |
 | Audit core | Before and after reads, diff, history storage, redaction. | FR-AUD-* |
@@ -114,7 +114,7 @@ Zone names are stored in PowerDNS canonical form with a trailing dot. SOAbox nev
 ## 5. Authentication Design
 
 - Local: argon2id password hashes, optional TOTP with secrets encrypted by an AEAD key derived from `SOABOX_SECRET_KEY`.
-- OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. For Entra, the issuer is the tenant-specific v2.0 endpoint and users are matched on `iss` and `oid`. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
+- OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. For Entra, the issuer is the tenant-specific v2.0 endpoint. Users are matched on the `iss` and `sub` claims, which Entra keeps stable for a user within one app registration. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
 - Sessions: a random 32-byte id in the cookie, SHA-256 hashed in the database. `HttpOnly`, `Secure`, `SameSite=Lax`. Rotated on sign-in and role change. Idle and absolute timeouts from configuration.
 - CSRF: per-session token sent in a header on state-changing `/v1` calls.
 - Rate limits: sign-in and failed key attempts per client IP and per account, in memory, returning `429`.

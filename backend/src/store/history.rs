@@ -21,7 +21,7 @@ pub struct NewHistory {
 }
 
 /// A stored history row.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq, utoipa::ToSchema)]
 pub struct HistoryEntry {
     pub id: i64,
     pub at: i64,
@@ -33,7 +33,9 @@ pub struct HistoryEntry {
     pub zone_name: Option<String>,
     pub outcome: String,
     pub upstream_status: Option<i64>,
+    #[schema(value_type = Option<Object>)]
     pub diff: Option<serde_json::Value>,
+    #[schema(value_type = Option<Object>)]
     pub detail: Option<serde_json::Value>,
 }
 

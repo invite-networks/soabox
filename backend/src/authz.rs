@@ -7,7 +7,8 @@ use std::collections::HashSet;
 use http::Method;
 
 use crate::pdns::ZoneName;
-use crate::store::{ApiKeyRecord, Role, Store};
+use crate::settings::Settings;
+use crate::store::{ApiKeyRecord, Role, Store, User, UserRole};
 
 /// How much of PowerDNS a principal may reach.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,9 +31,10 @@ pub struct Principal {
     pub level: Level,
     /// Canonical zone names in scope. Used only for [`Level::Limited`].
     pub zones: HashSet<String>,
-    /// Account new zones are created in. `None` means a limited principal
-    /// may not create zones.
+    /// Account new zones are assigned to, if any.
     pub create_account_id: Option<i64>,
+    /// Whether a limited principal may create zones.
+    pub can_create: bool,
     /// Whether a limited principal may delete zones in scope.
     pub can_delete_zones: bool,
 }
@@ -61,7 +63,40 @@ impl Principal {
             level,
             zones,
             create_account_id: key.create_account_id,
+            can_create: key.create_account_id.is_some(),
             can_delete_zones: true,
+        })
+    }
+
+    /// Builds the principal for a signed-in user.
+    pub async fn for_user(
+        store: &Store,
+        user: &User,
+        settings: &Settings,
+    ) -> Result<Self, sqlx::Error> {
+        let level = match user.role {
+            UserRole::Admin => Level::Admin,
+            UserRole::Operator => Level::Operator,
+            UserRole::User => Level::Limited,
+        };
+        let zones = if level == Level::Limited {
+            store
+                .user_access_zones(user.id)
+                .await?
+                .into_iter()
+                .collect()
+        } else {
+            HashSet::new()
+        };
+        Ok(Self {
+            actor_type: "user",
+            actor_id: user.id,
+            actor_name: user.username.clone(),
+            level,
+            zones,
+            create_account_id: None,
+            can_create: settings.user_can_create_zones,
+            can_delete_zones: settings.user_can_delete_zones,
         })
     }
 
@@ -77,7 +112,7 @@ impl Principal {
 
     /// True if the principal may create zones.
     pub fn can_create_zones(&self) -> bool {
-        self.all_zones() || self.create_account_id.is_some()
+        self.all_zones() || self.can_create
     }
 }
 
@@ -219,6 +254,7 @@ mod tests {
             level,
             zones: zones.iter().map(|z| (*z).to_owned()).collect(),
             create_account_id: create.then_some(1),
+            can_create: create,
             can_delete_zones: true,
         }
     }

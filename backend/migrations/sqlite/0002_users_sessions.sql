@@ -1,0 +1,42 @@
+-- Milestone 2: users, sessions, and zone access.
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL CHECK (role IN ('admin', 'operator', 'user')),
+    auth_source TEXT NOT NULL CHECK (auth_source IN ('local', 'oidc')),
+    oidc_issuer TEXT,
+    oidc_subject TEXT,
+    password_hash TEXT,
+    totp_secret_enc BLOB,
+    totp_enabled INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('active', 'pending', 'disabled')),
+    created_at INTEGER NOT NULL,
+    last_login_at INTEGER,
+    UNIQUE (oidc_issuer, oidc_subject)
+);
+
+CREATE TABLE sessions (
+    id_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    csrf_token TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    client_ip TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX sessions_user ON sessions (user_id);
+
+CREATE TABLE account_users (
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (account_id, user_id)
+);
+
+CREATE TABLE user_zones (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    zone_name TEXT NOT NULL,
+    PRIMARY KEY (user_id, zone_name)
+);

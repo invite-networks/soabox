@@ -2,9 +2,12 @@
 
 use std::sync::Arc;
 
+use std::time::Duration;
+
 use crate::config::Config;
 use crate::keys::KeyService;
 use crate::pdns::PdnsClient;
+use crate::ratelimit::FailureLimiter;
 use crate::store::Store;
 
 /// Everything handlers need. Cheap to clone.
@@ -14,6 +17,10 @@ pub struct AppState {
     pub store: Store,
     pub pdns: PdnsClient,
     pub keys: Arc<KeyService>,
+    /// Failed sign-in attempts per client address and per username.
+    pub logins: Arc<FailureLimiter>,
+    /// OIDC provider metadata, discovered on first use.
+    pub oidc_metadata: Arc<tokio::sync::OnceCell<openidconnect::core::CoreProviderMetadata>>,
 }
 
 impl AppState {
@@ -36,6 +43,17 @@ impl AppState {
             store,
             pdns,
             keys: Arc::new(KeyService::default()),
+            logins: Arc::new(FailureLimiter::new(10, Duration::from_secs(300))),
+            oidc_metadata: Arc::new(tokio::sync::OnceCell::new()),
         })
+    }
+
+    /// Keys accepted for decrypting data at rest, current first.
+    pub fn secret_keys(&self) -> Vec<&[u8; 32]> {
+        let mut keys = vec![&self.config.secret_key];
+        if let Some(prev) = &self.config.secret_key_previous {
+            keys.push(prev);
+        }
+        keys
     }
 }
