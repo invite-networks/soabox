@@ -205,12 +205,80 @@ pub fn absolute_name(name: &str, zone: &ZoneName) -> String {
     }
 }
 
+/// Positions of host names in each record type's presentation format.
+fn host_fields(rtype: &str) -> &'static [usize] {
+    match rtype {
+        "CNAME" | "NS" | "PTR" | "DNAME" | "ALIAS" => &[0],
+        "MX" | "AFSDB" | "HTTPS" | "SVCB" => &[1],
+        "SRV" => &[3],
+        "NAPTR" => &[5],
+        "RP" | "SOA" => &[0, 1],
+        _ => &[],
+    }
+}
+
+/// Splits presentation format into words, keeping quoted strings whole.
+fn split_tokens(content: &str) -> Option<Vec<&str>> {
+    let mut tokens = Vec::new();
+    let bytes = content.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i].is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        if bytes[i] == b'"' {
+            i += 1;
+            while i < bytes.len() && bytes[i] != b'"' {
+                i += if bytes[i] == b'\\' { 2 } else { 1 };
+            }
+            if i >= bytes.len() {
+                return None;
+            }
+            i += 1;
+        } else {
+            while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+        }
+        tokens.push(content.get(start..i)?);
+    }
+    Some(tokens)
+}
+
+/// Expands relative host names in template record content to names in `zone`,
+/// following zone file rules: `@` is the zone and names without a trailing dot are relative.
+pub fn expand_template_content(rtype: &str, content: &str, zone: &ZoneName) -> String {
+    let fields = host_fields(rtype);
+    if fields.is_empty() {
+        return content.to_owned();
+    }
+    let Some(tokens) = split_tokens(content) else {
+        return content.to_owned();
+    };
+    tokens
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            if fields.contains(&i) && !t.starts_with('"') {
+                absolute_name(t, zone)
+            } else {
+                (*t).to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn template_rrsets(t: &crate::store::Template, zone: &ZoneName) -> Vec<Value> {
     let mut sets: BTreeMap<(String, String), (i64, Vec<Value>)> = BTreeMap::new();
     for r in &t.records {
-        let key = (absolute_name(&r.name, zone), r.rtype.to_ascii_uppercase());
+        let rtype = r.rtype.to_ascii_uppercase();
+        let content = expand_template_content(&rtype, &r.content, zone);
+        let key = (absolute_name(&r.name, zone), rtype);
         let e = sets.entry(key).or_insert((r.ttl, Vec::new()));
-        e.1.push(json!({"content": r.content, "disabled": false}));
+        e.1.push(json!({"content": content, "disabled": false}));
     }
     sets.into_iter()
         .map(|((name, rtype), (ttl, records))| {
@@ -1199,6 +1267,40 @@ mod tests {
         assert_eq!(absolute_name("@", &z), "example.test.");
         assert_eq!(absolute_name("WWW", &z), "www.example.test.");
         assert_eq!(absolute_name("ns1.other.", &z), "ns1.other.");
+    }
+
+    #[test]
+    fn template_content_expands_relative_hosts() {
+        let z = ZoneName::from_name("a.test").expect("z");
+        assert_eq!(expand_template_content("CNAME", "www", &z), "www.a.test.");
+        assert_eq!(expand_template_content("CNAME", "@", &z), "a.test.");
+        assert_eq!(
+            expand_template_content("CNAME", "cdn.other.net.", &z),
+            "cdn.other.net."
+        );
+        assert_eq!(
+            expand_template_content("MX", "10 mail", &z),
+            "10 mail.a.test."
+        );
+        assert_eq!(expand_template_content("MX", "0 .", &z), "0 .");
+        assert_eq!(
+            expand_template_content("SRV", "10 5 5060 sip", &z),
+            "10 5 5060 sip.a.test."
+        );
+        assert_eq!(
+            expand_template_content("NAPTR", r#"100 10 "U" "E2U+sip" "!^.*$!sip:a@b!" sip"#, &z),
+            r#"100 10 "U" "E2U+sip" "!^.*$!sip:a@b!" sip.a.test."#
+        );
+        assert_eq!(
+            expand_template_content("SOA", "ns1 hostmaster 1 10800 3600 604800 3600", &z),
+            "ns1.a.test. hostmaster.a.test. 1 10800 3600 604800 3600"
+        );
+        assert_eq!(
+            expand_template_content("TXT", "\"v=spf1 -all\"", &z),
+            "\"v=spf1 -all\""
+        );
+        assert_eq!(expand_template_content("A", "192.0.2.1", &z), "192.0.2.1");
+        assert_eq!(expand_template_content("MX", "10 \"bad", &z), "10 \"bad");
     }
 
     #[test]

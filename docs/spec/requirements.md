@@ -120,11 +120,11 @@ Each requirement has a stable ID. IDs are never reused. Acceptance criteria are 
 |---|---|---|
 | FR-UI-01 | Zone list with search, pagination, kind, serial, DNSSEC state, and account. | Playwright tests. |
 | FR-UI-02 | Zone create (Native, Primary, Secondary, optional template), delete, notify, AXFR retrieve, rectify, and export. | Playwright tests. |
-| FR-UI-03 | Record editor with per-type validation, add, edit, delete, and disable, and a pending-changes review applied as one change. | Playwright tests. |
+| FR-UI-03 | Record editor with per-type validation, add, edit, delete, and disable, and a pending-changes review applied as one change. Each supported type is edited as separate named fields that accept only valid characters. Host names follow zone file rules: a trailing dot is absolute, `@` is the zone, and other names are relative to the zone. The record table shows the zone suffix of in-zone values in a muted color. | Vitest and Playwright tests. |
 | FR-UI-04 | Optional automatic PTR creation in reverse zones the user may edit. | Playwright tests. |
 | FR-UI-05 | DNSSEC: enable, disable, list keys and DS records, add, activate, deactivate, and remove keys. | Playwright tests. |
 | FR-UI-06 | Zone metadata view and edit. | Playwright tests. |
-| FR-UI-07 | Zone templates. | Playwright tests. |
+| FR-UI-07 | Zone templates, edited with the same per-type fields. Relative host names in template values are kept relative and expanded to the new zone when a zone is created from the template. | Vitest and backend unit tests. |
 | FR-UI-08 | History views (FR-AUD-04). | Playwright tests. |
 | FR-UI-09 | Administration of users, accounts, roles, API keys, settings, and TSIG keys. | Playwright tests. |
 | FR-UI-10 | Server configuration and statistics, read only. | Playwright tests. |

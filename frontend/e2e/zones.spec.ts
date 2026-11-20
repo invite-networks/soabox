@@ -29,7 +29,7 @@ test.describe("zones", () => {
     await page.getByRole("button", { name: "Add record" }).click();
     let dialog = page.getByRole("dialog", { name: "Add records" });
     await dialog.getByRole("textbox", { name: "Name", exact: true }).fill("www");
-    await dialog.getByRole("textbox", { name: "Value 1" }).fill("192.0.2.10");
+    await dialog.getByRole("textbox", { name: "IPv4 address" }).fill("192.0.2.10");
     await dialog.getByRole("button", { name: "Add to pending changes" }).click();
 
     // Add a TXT record in the same batch.
@@ -38,11 +38,21 @@ test.describe("zones", () => {
     await dialog.getByRole("textbox", { name: "Name", exact: true }).fill("@");
     await dialog.getByRole("button", { name: /Type/ }).click();
     await page.getByRole("option", { name: "TXT", exact: true }).click();
-    await dialog.getByRole("textbox", { name: "Value 1" }).fill("v=spf1 -all");
+    await dialog.getByRole("textbox", { name: "Text" }).fill("v=spf1 -all");
+    await dialog.getByRole("button", { name: "Add to pending changes" }).click();
+
+    // Add a CNAME with a relative target. The zone is appended.
+    await page.getByRole("button", { name: "Add record" }).click();
+    dialog = page.getByRole("dialog", { name: "Add records" });
+    await dialog.getByRole("textbox", { name: "Name", exact: true }).fill("alias");
+    await dialog.getByRole("button", { name: /Type/ }).click();
+    await page.getByRole("option", { name: "CNAME", exact: true }).click();
+    await dialog.getByRole("textbox", { name: "Target" }).fill("www");
+    await expect(dialog).toContainText(`.${zone}`);
     await dialog.getByRole("button", { name: "Add to pending changes" }).click();
 
     const pending = page.getByRole("region", { name: "Pending changes" });
-    await expect(pending).toContainText("2 pending changes");
+    await expect(pending).toContainText("3 pending changes");
 
     const patches: string[] = [];
     page.on("request", (request) => {
@@ -53,18 +63,19 @@ test.describe("zones", () => {
     await pending.getByRole("button", { name: "Review and apply" }).click();
     const review = page.getByRole("dialog", { name: "Review pending changes" });
     await expect(review).toContainText("192.0.2.10");
-    await review.getByRole("button", { name: "Apply 2 changes" }).click();
+    await review.getByRole("button", { name: "Apply 3 changes" }).click();
     await expect(page.getByText("Changes applied.")).toBeVisible();
     expect(patches).toHaveLength(1);
 
     const records = page.getByRole("table", { name: "Records" });
     await expect(records.getByRole("rowheader", { name: "www" })).toBeVisible();
     await expect(records).toContainText('"v=spf1 -all"');
+    await expect(records).toContainText(`www.${zone}`);
 
     // Edit the record, then confirm history recorded the change.
     await page.getByRole("button", { name: "Edit www A" }).click();
     dialog = page.getByRole("dialog", { name: "Edit A records" });
-    await dialog.getByRole("textbox", { name: "Value 1" }).fill("192.0.2.11");
+    await dialog.getByRole("textbox", { name: "IPv4 address" }).fill("192.0.2.11");
     await dialog.getByRole("button", { name: "Save to pending changes" }).click();
     await page.getByRole("button", { name: "Review and apply" }).click();
     await page.getByRole("button", { name: "Apply 1 change" }).click();
