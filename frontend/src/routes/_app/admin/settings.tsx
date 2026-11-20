@@ -246,6 +246,13 @@ function SsoForm({ initial }: { initial: OidcSettings }) {
               errorMessage={errors.issuer}
             />
             <TextField
+              label="Button label"
+              value={values.button_label}
+              onChange={(v) => set("button_label", v)}
+              isReadOnly={fromEnv}
+              errorMessage={errors.button_label}
+            />
+            <TextField
               label="Client ID"
               mono
               value={values.client_id}
@@ -279,13 +286,6 @@ function SsoForm({ initial }: { initial: OidcSettings }) {
                 </span>
               </div>
             )}
-            <TextField
-              label="Button label"
-              value={values.button_label}
-              onChange={(v) => set("button_label", v)}
-              isReadOnly={fromEnv}
-              errorMessage={errors.button_label}
-            />
           </FieldGrid>
           {!fromEnv && (
             <div>
