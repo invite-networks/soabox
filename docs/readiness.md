@@ -16,8 +16,10 @@
 
 ## Open Later-Phase Items
 
-| Item | Owner | When |
+| Item | Owner | Status |
 |---|---|---|
-| Execute every runbook in a test environment and record results | Maintainer | Before first release |
-| Verify Entra ID setup against a live tenant | Maintainer | Before first release |
-| Load tests for NFR-PERF-01 and NFR-PERF-02 | Maintainer | Before first release |
+| Execute every runbook in a test environment and record results | Maintainer | Executed by the authoring agent on 2026-11-19. Independent execution still required before the first release. |
+| Verify Entra ID setup against a live tenant | Maintainer | Open. OIDC is verified end to end against a mock provider in CI. |
+| Load tests for NFR-PERF-01 and NFR-PERF-02 | Maintainer | Passed on 2026-11-19 on a workstation. Repeat on reference hardware before the first release. |
+| Security and dependency audit | Maintainer | Completed 2026-11-19. All Critical and High findings fixed with regression tests. Accepted items carry written reasons and a review date of 2027-02-19. |
+| Independent review of the documentation baseline | Maintainer | Open. |
