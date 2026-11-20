@@ -10,4 +10,4 @@ Operating procedures for people who run SOAbox. Each names its trigger, prerequi
 | [Backup and recovery](recovery.md) | Scheduled backups, restores, PowerDNS outages, lost Admin access. |
 | [Key and secret rotation](key-rotation.md) | Rotating the PowerDNS key, the secret key, the OIDC secret, or revoking access. |
 
-Validation status for every runbook: **Planned, not yet executed.** Each will be executed in a test environment before the first release and the result recorded here.
+Every runbook was executed on 2026-11-19 by the authoring agent (results in each runbook). Before the first release, someone other than the author must execute them in a test environment and record the result here.

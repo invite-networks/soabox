@@ -1,6 +1,6 @@
 # Backup And Recovery
 
-- Validation status: **Planned, not yet executed.**
+- Validation status: **Executed 2026-11-19** on Docker Desktop (macOS) by the authoring agent, against the development stack and the production Compose example with Postgres. Independent execution by someone other than the author is still required before the first release.
 
 SOAbox stores keys, users, settings, and history. DNS data lives in PowerDNS and needs its own backup.
 
@@ -13,7 +13,7 @@ SOAbox stores keys, users, settings, and history. DNS data lives in PowerDNS and
 ## Restore
 
 1. `docker compose stop soabox`
-2. SQLite: replace `data/soabox/soabox.db` with the backup. Postgres: `pg_restore --clean`.
+2. SQLite: replace `data/soabox/soabox.db` with the backup and delete any `soabox.db-wal` and `soabox.db-shm` files next to it. Postgres: `pg_restore --clean`.
 3. `docker compose start soabox` and confirm `/readyz`.
 
 ## PowerDNS Outage
