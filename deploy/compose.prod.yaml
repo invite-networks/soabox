@@ -1,0 +1,60 @@
+# Example production deployment with Postgres. Copy next to a .env file.
+# Put a TLS-terminating reverse proxy in front of port 8080 and set
+# SOABOX_TRUSTED_PROXIES to its address. The PowerDNS API is not published.
+name: soabox
+
+services:
+  soabox:
+    image: ghcr.io/invite-networks/soabox:latest   # pin a digest in production
+    env_file: .env
+    environment:
+      SOABOX_MODE: prod
+      SOABOX_PDNS_URL: http://pdns:8081
+      SOABOX_DATABASE_URL: postgres://soabox:${POSTGRES_PASSWORD:?}@postgres/soabox
+    volumes:
+      - ./data/soabox:/app/data
+    ports:
+      - "8080:8080"
+    read_only: true
+    depends_on:
+      - postgres
+      - pdns
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: soabox
+      POSTGRES_DB: soabox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql
+    restart: unless-stopped
+
+  pdns-init:
+    image: powerdns/pdns-auth-51:5.1.5
+    user: "0"
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        [ -f /var/lib/powerdns/pdns.sqlite3 ] ||
+        sqlite3 /var/lib/powerdns/pdns.sqlite3 < /usr/local/share/doc/pdns/schema.sqlite3.sql;
+        chown -R 953:953 /var/lib/powerdns
+    volumes:
+      - ./data/pdns:/var/lib/powerdns
+    restart: "no"
+
+  pdns:
+    image: powerdns/pdns-auth-51:5.1.5
+    environment:
+      PDNS_AUTH_API_KEY: ${PDNS_AUTH_API_KEY:?}
+    volumes:
+      - ./data/pdns:/var/lib/powerdns
+    depends_on:
+      pdns-init:
+        condition: service_completed_successfully
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    restart: unless-stopped

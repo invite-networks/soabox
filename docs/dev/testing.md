@@ -4,7 +4,7 @@ Test tiers and requirement coverage are defined in the [test plan](../spec/test-
 
 ## Commands
 
-**Planned, not yet executed** until milestone 1 records results.
+Backend commands were executed for milestone 1 on 2026-11-19 (see the [milestone 1 results](../plans/milestone-1-passthrough.md#results)). Frontend commands are **Planned, not yet executed** until milestone 3.
 
 ```sh
 # backend
@@ -13,13 +13,14 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo nextest run
 cargo test --doc
-cargo llvm-cov nextest --fail-under-lines 80
+cargo llvm-cov nextest --test-threads 1 --fail-under-lines 80
 cargo audit
 cargo deny check
 
 # compatibility suite against real PowerDNS
 docker compose up -d pdns
-SOABOX_COMPAT_PDNS_URL=http://localhost:8081 SOABOX_COMPAT_PDNS_KEY=<dev key> cargo nextest run --test compat
+SOABOX_COMPAT_PDNS_URL=http://localhost:8081 SOABOX_COMPAT_PDNS_KEY=<PDNS_AUTH_API_KEY> \
+  cargo nextest run --test compat --test-threads 1
 
 # Postgres integration
 SOABOX_TEST_POSTGRES_URL=postgres://... cargo nextest run

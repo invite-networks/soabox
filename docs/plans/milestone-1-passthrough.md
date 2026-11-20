@@ -120,6 +120,29 @@ See the [design document](../spec/design.md) for the overall architecture, or go
 
 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10. Tasks 4 and 5 can run in parallel after 3. The compat suite harness (Task 9) starts as soon as Task 7 forwards plain requests, so it can guide Tasks 7 and 8.
 
+## Results
+
+Executed on 2026-11-19 on macOS (arm64) with Docker Desktop, Rust 1.99, PowerDNS Authoritative 5.1.5, and Postgres 18.
+
+| Check | Result |
+|---|---|
+| `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` | Pass |
+| Unit and integration tests (`cargo nextest run`) | 126 passed |
+| Compatibility suite against PowerDNS 5.1.5 | 4 suites passed: discovery and reads (20 endpoints), errors, scoped missing-zone equality, twin-zone writes |
+| Store tests on Postgres 18 | Pass |
+| Line coverage (`cargo llvm-cov`) | 87.3% |
+| `cargo audit` | No advisories |
+| `cargo deny check` | advisories, bans, licenses, sources ok |
+| Container: build, `/readyz`, key creation, zone create through `/api`, history, restart with data kept | Pass |
+
+Changes from the plan made during implementation:
+
+- PowerDNS answers a forbidden or unknown key with `401` and `WWW-Authenticate: X-API-Key realm="PowerDNS"`, a missing zone or server with `404 {"error": "Not Found"}`, and uses `": "` and `", "` separators. SOAbox reproduces all of these byte for byte.
+- PowerDNS sends no `Server` header. SOAbox copies all upstream headers except hop-by-hop ones instead.
+- `OPTIONS` (CORS preflight) is forwarded without a key, as PowerDNS answers it without one.
+- Zones created by a scoped key are also added to that key's own zone list, so the key can reach them even if its create account is not in its account scope.
+- The development Compose file has a `pdns-init` service that creates the PowerDNS SQLite schema, because a bind mount hides the image's database.
+
 ## Later Milestones (Outline)
 
 2. **Auth**: users, sessions, local login with TOTP, OIDC with Entra guide, `local_login_with_oidc` setting, `/v1` API skeleton with OpenAPI and CSRF.

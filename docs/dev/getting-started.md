@@ -14,10 +14,19 @@ git clone https://github.com/invite-networks/soabox.git
 cd soabox
 pre-commit install
 cp .env.example .env          # edit values, see configuration.md
-docker compose up --build     # SOAbox on http://localhost:8080, PowerDNS API on the internal network
+docker compose up --build     # SOAbox on http://localhost:8080
 ```
 
-The development stack starts PowerDNS Authoritative 5 with a SQLite backend and SOAbox in `dev` mode. Data for both is bind mounted under `data/`.
+The development stack starts PowerDNS Authoritative 5 with a SQLite backend and SOAbox in `dev` mode. Data for both is bind mounted under `data/`. A one-shot `pdns-init` service creates the PowerDNS database on first start.
+
+If ports 8080 or 8081 are taken on your machine, set `SOABOX_HOST_PORT` and `PDNS_API_HOST_PORT` in `.env`. The PowerDNS API port is published on localhost only, for the compatibility tests.
+
+Create an API key and try the passthrough:
+
+```sh
+docker compose exec soabox soabox apikey create --role admin --description local
+curl -H "X-API-Key: <key>" http://localhost:8080/api/v1/servers/localhost/zones
+```
 
 ## Working On The Backend
 

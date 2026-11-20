@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: local
+    hooks:
+      - id: rustfmt
+        name: rustfmt
+        entry: bash -c 'cd backend && cargo fmt --check'
+        language: system
+        files: ^backend/.*\.rs$
+        pass_filenames: false
+      - id: clippy
+        name: clippy
+        entry: bash -c 'cd backend && cargo clippy --all-targets -- -D warnings'
+        language: system
+        files: ^backend/
+        pass_filenames: false
