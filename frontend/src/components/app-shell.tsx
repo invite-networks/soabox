@@ -80,12 +80,12 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav aria-label="Main" className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
       <div className="flex flex-col gap-1">
-        <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted/80 uppercase">DNS</h2>
+        <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted uppercase">DNS</h2>
         <ul className="flex flex-col gap-0.5">{visible(mainNav).map(link)}</ul>
       </div>
       {admin.length > 0 && (
         <div className="flex flex-col gap-1">
-          <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted/80 uppercase">
+          <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted uppercase">
             Administration
           </h2>
           <ul className="flex flex-col gap-0.5">{admin.map(link)}</ul>
@@ -160,14 +160,11 @@ function UserMenu() {
       <Button variant="ghost" aria-label={`Account menu for ${me.user.display_name || me.user.username}`}>
         <span
           aria-hidden
-          className="flex size-6 items-center justify-center rounded-full bg-accent-soft text-[11px] font-semibold text-accent-text uppercase"
+          className="flex size-6 items-center justify-center rounded-full bg-accent-soft text-accent-text [&_svg]:size-3.5"
         >
-          {(me.user.display_name || me.user.username).slice(0, 1)}
+          <User aria-hidden />
         </span>
-        <span className="hidden max-w-40 flex-col items-start leading-tight sm:flex">
-          <span className="truncate">{me.user.display_name || me.user.username}</span>
-          <span className="text-[11px] font-normal text-fg-muted capitalize">{me.user.role}</span>
-        </span>
+        <span className="hidden max-w-40 truncate sm:inline">{me.user.display_name || me.user.username}</span>
         <ChevronDown aria-hidden />
       </Button>
       <Menu label="Account" onAction={onAction}>
