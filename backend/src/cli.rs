@@ -35,6 +35,15 @@ pub enum Command {
     /// Manage accounts.
     #[command(subcommand)]
     Account(AccountCommand),
+    /// Create a local Admin and print a one-time password.
+    CreateAdmin {
+        #[arg(long)]
+        username: String,
+    },
+    /// Re-encrypt stored secrets with the current SOABOX_SECRET_KEY.
+    RotateSecrets,
+    /// Print the OpenAPI document for /auth and /v1.
+    Openapi,
     /// Show change history.
     History {
         /// Only this zone.
@@ -101,6 +110,10 @@ pub enum AccountCommand {
 
 /// Runs the parsed command.
 pub async fn run(cli: Cli) -> anyhow::Result<()> {
+    if matches!(cli.command, Command::Openapi) {
+        println!("{}", crate::openapi::json());
+        return Ok(());
+    }
     let config = Config::from_env().context("configuration")?;
     crate::telemetry::init(&config, !matches!(cli.command, Command::Serve));
     match cli.command {
@@ -110,6 +123,21 @@ pub async fn run(cli: Cli) -> anyhow::Result<()> {
             let store = Store::connect(config.database_url.expose()).await?;
             store.backup_sqlite(&dest).await?;
             println!("backup written to {dest}");
+            Ok(())
+        }
+        Command::Openapi => Ok(()),
+        Command::CreateAdmin { username } => {
+            let store = Store::connect(config.database_url.expose()).await?;
+            let password = create_admin(&store, &username).await?;
+            println!("username: {username}");
+            println!("password: {password}");
+            println!("Sign in and change this password now.");
+            Ok(())
+        }
+        Command::RotateSecrets => {
+            let state = AppState::new(config).await?;
+            let n = rotate_secrets(&state).await?;
+            println!("re-encrypted {n} secrets");
             Ok(())
         }
         Command::Apikey(c) => {
@@ -150,6 +178,8 @@ pub async fn run(cli: Cli) -> anyhow::Result<()> {
 async fn serve(config: Config) -> anyhow::Result<()> {
     let bind = config.bind;
     let state = AppState::new(config).await?;
+    crate::auth::bootstrap_admin(&state).await?;
+    spawn_session_cleanup(state.clone());
     let app = crate::app::router(state);
     let listener = tokio::net::TcpListener::bind(bind)
         .await
@@ -162,6 +192,64 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await?;
     Ok(())
+}
+
+fn spawn_session_cleanup(state: AppState) {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(600));
+        loop {
+            tick.tick().await;
+            let idle = i64::try_from(state.config.session_idle.as_secs()).unwrap_or(i64::MAX);
+            let cutoff = crate::store::now().saturating_sub(idle);
+            match state.store.purge_sessions(cutoff).await {
+                Ok(n) if n > 0 => tracing::info!(removed = n, "expired sessions removed"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!(error = %e, "session cleanup failed"),
+            }
+        }
+    });
+}
+
+/// Creates a local Admin with a random password, which is returned.
+pub async fn create_admin(store: &Store, username: &str) -> anyhow::Result<String> {
+    anyhow::ensure!(
+        store.find_user_by_username(username).await?.is_none(),
+        "user {username} already exists"
+    );
+    let password = crate::auth::crypto::random_token()?;
+    store
+        .create_user(&crate::store::NewUser {
+            username: username.to_owned(),
+            display_name: username.to_owned(),
+            email: String::new(),
+            role: crate::store::UserRole::Admin,
+            auth_source: "local",
+            oidc_issuer: None,
+            oidc_subject: None,
+            password_hash: Some(crate::auth::crypto::hash_password(&password)?),
+            status: crate::store::UserStatus::Active,
+        })
+        .await?;
+    Ok(password)
+}
+
+/// Re-encrypts TOTP secrets with the current key. Returns how many.
+pub async fn rotate_secrets(state: &AppState) -> anyhow::Result<usize> {
+    let keys = state.secret_keys();
+    let mut n = 0;
+    for (id, enc) in state.store.users_with_totp().await? {
+        let plain = crate::auth::crypto::decrypt(&keys, &enc)
+            .with_context(|| format!("user {id}: secret cannot be decrypted with either key"))?;
+        let fresh = crate::auth::crypto::encrypt(&state.config.secret_key, &plain)?;
+        let enabled = state
+            .store
+            .get_user(id)
+            .await?
+            .is_some_and(|u| u.totp_enabled);
+        state.store.set_totp(id, Some(&fresh), enabled).await?;
+        n += 1;
+    }
+    Ok(n)
 }
 
 async fn shutdown_signal() {

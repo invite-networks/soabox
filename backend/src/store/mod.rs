@@ -8,10 +8,14 @@ mod accounts;
 mod api_keys;
 mod history;
 mod settings;
+mod templates;
+mod users;
 
 pub use accounts::Account;
 pub use api_keys::{ApiKeyRecord, NewApiKey, Role};
 pub use history::{HistoryEntry, HistoryFilter, NewHistory};
+pub use templates::{Template, TemplateRecord};
+pub use users::{NewUser, SessionRecord, User, UserRole, UserStatus};
 
 use std::str::FromStr;
 use std::time::Duration;

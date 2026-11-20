@@ -137,9 +137,9 @@ pub async fn security_headers(State(state): State<AppState>, req: Request, next:
     set(
         h,
         "content-security-policy",
-        "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; \
-         connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; \
-         form-action 'self'",
+        "default-src 'self'; img-src 'self' data:; style-src 'self'; \
+         style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; \
+         frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     if state.config.hsts {
         set(

@@ -4,6 +4,12 @@ all-features = false
 [advisories]
 version = 2
 yanked = "deny"
+# Fail on unmaintained crates we depend on directly. Transitive ones (for
+# example chrono through openidconnect) are reported by cargo audit.
+unmaintained = "workspace"
+ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "rsa is used only for public-key signature verification of OIDC ID tokens; the Marvin attack targets private-key operations" },
+]
 
 [licenses]
 version = 2

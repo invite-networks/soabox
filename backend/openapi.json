@@ -1,0 +1,3056 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SOAbox UI API",
+    "description": "API used by the SOAbox web interface. See docs/spec/v1-api.md.",
+    "license": {
+      "name": "Apache-2.0"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/auth/config": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "`GET /auth/config`",
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfig"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "`POST /auth/login`",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "`POST /auth/logout`",
+        "operationId": "logout",
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/accounts": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/accounts`",
+        "operationId": "list_accounts",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`POST /v1/accounts`",
+        "operationId": "create_account",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`PUT /v1/accounts/{id}`",
+        "operationId": "update_account",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`DELETE /v1/accounts/{id}`",
+        "operationId": "delete_account",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/api-keys": {
+      "get": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`GET /v1/api-keys`",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`POST /v1/api-keys`",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedKey"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys/{id}": {
+      "put": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`PUT /v1/api-keys/{id}`",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`DELETE /v1/api-keys/{id}`",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/api-keys/{id}/disable": {
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`POST /v1/api-keys/{id}/disable`",
+        "operationId": "disable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/api-keys/{id}/enable": {
+      "post": {
+        "tags": [
+          "api-keys"
+        ],
+        "summary": "`POST /v1/api-keys/{id}/enable`",
+        "operationId": "enable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/dashboard": {
+      "get": {
+        "tags": [
+          "server"
+        ],
+        "summary": "`GET /v1/dashboard`",
+        "operationId": "dashboard",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/history": {
+      "get": {
+        "tags": [
+          "history"
+        ],
+        "summary": "`GET /v1/history`",
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "zone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "operation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`GET /v1/me`",
+        "operationId": "get_me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`PUT /v1/me`",
+        "operationId": "update_me",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/password": {
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`PUT /v1/me/password`",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/me/totp": {
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`DELETE /v1/me/totp`",
+        "operationId": "totp_disable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/me/totp/enable": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`POST /v1/me/totp/enable`",
+        "operationId": "totp_enable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/me/totp/setup": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "`POST /v1/me/totp/setup`",
+        "operationId": "totp_setup",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetup"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/server": {
+      "get": {
+        "tags": [
+          "server"
+        ],
+        "summary": "`GET /v1/server`",
+        "operationId": "server",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/server/config": {
+      "get": {
+        "tags": [
+          "server"
+        ],
+        "summary": "`GET /v1/server/config`",
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/server/statistics": {
+      "get": {
+        "tags": [
+          "server"
+        ],
+        "summary": "`GET /v1/server/statistics`",
+        "operationId": "statistics",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/settings`",
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`PUT /v1/settings`",
+        "operationId": "put_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/templates": {
+      "get": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "`GET /v1/templates`",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Template"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "`POST /v1/templates`",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/templates/{id}": {
+      "put": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "`PUT /v1/templates/{id}`",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Template"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "`DELETE /v1/templates/{id}`",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/tsigkeys": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/tsigkeys`",
+        "operationId": "list_tsig",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`POST /v1/tsigkeys`",
+        "operationId": "create_tsig",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewTsig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tsigkeys/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/tsigkeys/{id}`",
+        "operationId": "get_tsig",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`PUT /v1/tsigkeys/{id}`",
+        "operationId": "update_tsig",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTsig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`DELETE /v1/tsigkeys/{id}`",
+        "operationId": "delete_tsig",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/users`",
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`POST /v1/users`",
+        "operationId": "create_user",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`PUT /v1/users/{id}`",
+        "operationId": "update_user",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`DELETE /v1/users/{id}`",
+        "operationId": "delete_user",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/users/{id}/password": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`POST /v1/users/{id}/password`",
+        "operationId": "set_user_password",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/users/{id}/revoke-sessions": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`POST /v1/users/{id}/revoke-sessions`",
+        "operationId": "revoke_sessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/users/{id}/totp": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`DELETE /v1/users/{id}/totp`",
+        "operationId": "reset_totp",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/zones": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`GET /v1/zones`",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonePage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`POST /v1/zones`",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateZone"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`GET /v1/zones/{id}`",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`PUT /v1/zones/{id}`",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateZone"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      },
+      "delete": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`DELETE /v1/zones/{id}`",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/zones/{id}/axfr-retrieve": {
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`POST /v1/zones/{id}/axfr-retrieve`",
+        "operationId": "axfr_retrieve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/cryptokeys": {
+      "get": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`GET /v1/zones/{id}/cryptokeys`",
+        "operationId": "list_cryptokeys",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`POST /v1/zones/{id}/cryptokeys`",
+        "operationId": "create_cryptokey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCryptokey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/cryptokeys/{key_id}": {
+      "put": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`PUT /v1/zones/{id}/cryptokeys/{key_id}`",
+        "operationId": "update_cryptokey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptokeyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      },
+      "delete": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`DELETE /v1/zones/{id}/cryptokeys/{key_id}`",
+        "operationId": "delete_cryptokey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/zones/{id}/dnssec": {
+      "post": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`POST /v1/zones/{id}/dnssec`",
+        "operationId": "set_dnssec",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DnssecToggle"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/zones/{id}/export": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`GET /v1/zones/{id}/export`",
+        "operationId": "export",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneExport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/history": {
+      "get": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`GET /v1/zones/{id}/history`",
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/metadata": {
+      "get": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`GET /v1/zones/{id}/metadata`",
+        "operationId": "list_metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/metadata/{kind}": {
+      "put": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`PUT /v1/zones/{id}/metadata/{kind}`",
+        "operationId": "put_metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetadataValues"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      },
+      "delete": {
+        "tags": [
+          "dnssec"
+        ],
+        "summary": "`DELETE /v1/zones/{id}/metadata/{kind}`",
+        "operationId": "delete_metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {}
+        }
+      }
+    },
+    "/v1/zones/{id}/notify": {
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`POST /v1/zones/{id}/notify`",
+        "operationId": "notify",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/rectify": {
+      "post": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`POST /v1/zones/{id}/rectify`",
+        "operationId": "rectify",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones/{id}/rrsets": {
+      "patch": {
+        "tags": [
+          "zones"
+        ],
+        "summary": "`PATCH /v1/zones/{id}/rrsets`",
+        "operationId": "patch_rrsets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RrSetPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountInput": {
+        "type": "object",
+        "description": "Account fields.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "zones": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "AccountRef": {
+        "type": "object",
+        "description": "The account a zone belongs to.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AccountView": {
+        "type": "object",
+        "description": "An account with its zones and members.",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "zones",
+          "user_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "ActionResult": {
+        "type": "object",
+        "description": "A short PowerDNS result message.",
+        "required": [
+          "result"
+        ],
+        "properties": {
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthConfig": {
+        "type": "object",
+        "description": "What the sign-in page offers.",
+        "required": [
+          "local_enabled",
+          "oidc_enabled",
+          "oidc_label"
+        ],
+        "properties": {
+          "local_enabled": {
+            "type": "boolean"
+          },
+          "oidc_enabled": {
+            "type": "boolean"
+          },
+          "oidc_label": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateUser": {
+        "type": "object",
+        "description": "A new local user.",
+        "required": [
+          "username",
+          "role",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateZone": {
+        "type": "object",
+        "description": "A new zone.",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "masters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nameservers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "template_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "soa_edit_api": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreatedKey": {
+        "type": "object",
+        "description": "A created key with its secret, shown once.",
+        "required": [
+          "key",
+          "secret"
+        ],
+        "properties": {
+          "key": {
+            "type": "object"
+          },
+          "secret": {
+            "type": "string"
+          }
+        }
+      },
+      "CryptokeyUpdate": {
+        "type": "object",
+        "description": "Key state changes.",
+        "required": [
+          "active",
+          "published"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "published": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "description": "Dashboard summary.",
+        "required": [
+          "zone_count",
+          "recent_history"
+        ],
+        "properties": {
+          "zone_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recent_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            }
+          },
+          "server": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ServerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "DnssecToggle": {
+        "type": "object",
+        "description": "Turn DNSSEC on or off.",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "nsec3param": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "description": "The standard error body for `/v1` and `/auth`.",
+        "required": [
+          "detail",
+          "code",
+          "status"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Human-readable message, safe to show to a user."
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable code."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code.",
+            "minimum": 0
+          }
+        }
+      },
+      "HistoryEntry": {
+        "type": "object",
+        "description": "A stored history row.",
+        "required": [
+          "id",
+          "at",
+          "actor_type",
+          "actor_name",
+          "client_ip",
+          "operation",
+          "outcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor_type": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "actor_name": {
+            "type": "string"
+          },
+          "client_ip": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "zone_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zone_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The zone's id for `/v1/zones/{id}` links."
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "upstream_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "diff": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "detail": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      },
+      "HistoryPage": {
+        "type": "object",
+        "description": "A page of history.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            }
+          }
+        }
+      },
+      "KeyInput": {
+        "type": "object",
+        "description": "Key fields from the UI.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "create_account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "networks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "LocalLogin": {
+        "type": "string",
+        "description": "Whether local accounts may sign in while OIDC is configured.",
+        "enum": [
+          "allow",
+          "deny"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Credentials for local sign-in.",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "totp_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "description": "The signed-in user, their CSRF token, and permissions.",
+        "required": [
+          "user",
+          "csrf_token",
+          "permissions"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/MeUser"
+          },
+          "csrf_token": {
+            "type": "string"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/Permissions"
+          }
+        }
+      },
+      "MeUser": {
+        "type": "object",
+        "description": "Profile fields of the signed-in user.",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "email",
+          "role",
+          "auth_source",
+          "totp_enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "auth_source": {
+            "type": "string"
+          },
+          "totp_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MetadataValues": {
+        "type": "object",
+        "description": "Metadata values for one kind.",
+        "required": [
+          "metadata"
+        ],
+        "properties": {
+          "metadata": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NewCryptokey": {
+        "type": "object",
+        "description": "A new DNSSEC key.",
+        "required": [
+          "keytype",
+          "active"
+        ],
+        "properties": {
+          "keytype": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "algorithm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bits": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "NewOidcUser": {
+        "type": "string",
+        "description": "What happens to a new OIDC user.",
+        "enum": [
+          "create",
+          "approve"
+        ]
+      },
+      "NewTsig": {
+        "type": "object",
+        "description": "A new TSIG key.",
+        "required": [
+          "name",
+          "algorithm"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string"
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PasswordChange": {
+        "type": "object",
+        "description": "A password change.",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          }
+        }
+      },
+      "Permissions": {
+        "type": "object",
+        "description": "What a user may do, for the UI.",
+        "required": [
+          "manage_users",
+          "manage_settings",
+          "manage_tsig",
+          "view_server",
+          "all_zones",
+          "create_zones",
+          "delete_zones",
+          "view_history",
+          "manage_dnssec",
+          "manage_templates",
+          "create_api_keys"
+        ],
+        "properties": {
+          "manage_users": {
+            "type": "boolean"
+          },
+          "manage_settings": {
+            "type": "boolean"
+          },
+          "manage_tsig": {
+            "type": "boolean"
+          },
+          "view_server": {
+            "type": "boolean"
+          },
+          "all_zones": {
+            "type": "boolean"
+          },
+          "create_zones": {
+            "type": "boolean"
+          },
+          "delete_zones": {
+            "type": "boolean"
+          },
+          "view_history": {
+            "type": "boolean"
+          },
+          "manage_dnssec": {
+            "type": "boolean"
+          },
+          "manage_templates": {
+            "type": "boolean"
+          },
+          "create_api_keys": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "description": "Profile fields a user may change.",
+        "required": [
+          "display_name",
+          "email"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "RrSetChange": {
+        "type": "object",
+        "description": "One RRset change.",
+        "required": [
+          "name",
+          "type",
+          "changetype"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "changetype": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "comments": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "RrSetPatch": {
+        "type": "object",
+        "description": "A batch of RRset changes.",
+        "required": [
+          "rrsets"
+        ],
+        "properties": {
+          "rrsets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RrSetChange"
+            }
+          }
+        }
+      },
+      "ServerSummary": {
+        "type": "object",
+        "description": "Server version and uptime.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SetPassword": {
+        "type": "object",
+        "description": "A new password for a user.",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "description": "All settings. See the design's settings table.",
+        "required": [
+          "local_login_with_oidc",
+          "oidc_new_user",
+          "user_can_create_zones",
+          "user_can_delete_zones",
+          "user_can_view_history",
+          "user_can_manage_dnssec",
+          "user_can_create_api_keys",
+          "record_types_forward",
+          "record_types_reverse",
+          "auto_ptr"
+        ],
+        "properties": {
+          "local_login_with_oidc": {
+            "$ref": "#/components/schemas/LocalLogin"
+          },
+          "oidc_new_user": {
+            "$ref": "#/components/schemas/NewOidcUser"
+          },
+          "user_can_create_zones": {
+            "type": "boolean"
+          },
+          "user_can_delete_zones": {
+            "type": "boolean"
+          },
+          "user_can_view_history": {
+            "type": "boolean"
+          },
+          "user_can_manage_dnssec": {
+            "type": "boolean"
+          },
+          "user_can_create_api_keys": {
+            "type": "boolean"
+          },
+          "record_types_forward": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "record_types_reverse": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "auto_ptr": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SettingsPatch": {
+        "type": "object",
+        "description": "A partial update. Missing fields are unchanged.",
+        "properties": {
+          "local_login_with_oidc": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LocalLogin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "oidc_new_user": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NewOidcUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_can_create_zones": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "user_can_delete_zones": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "user_can_view_history": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "user_can_manage_dnssec": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "user_can_create_api_keys": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "record_types_forward": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "record_types_reverse": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "auto_ptr": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "description": "A stored template.",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "records"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateRecord"
+            }
+          }
+        }
+      },
+      "TemplateInput": {
+        "type": "object",
+        "description": "Template fields.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateRecord"
+            }
+          }
+        }
+      },
+      "TemplateRecord": {
+        "type": "object",
+        "description": "One record in a template. `name` is relative: `@` or a label.",
+        "required": [
+          "name",
+          "type",
+          "ttl",
+          "content"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "TotpCode": {
+        "type": "object",
+        "description": "A TOTP code.",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "TotpSetup": {
+        "type": "object",
+        "description": "A new TOTP secret to show the user before enabling it.",
+        "required": [
+          "secret",
+          "otpauth_url"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "otpauth_url": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateTsig": {
+        "type": "object",
+        "description": "TSIG key changes.",
+        "properties": {
+          "algorithm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateUser": {
+        "type": "object",
+        "description": "Changes to a user.",
+        "required": [
+          "display_name",
+          "email",
+          "role",
+          "status"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "account_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "UpdateZone": {
+        "type": "object",
+        "description": "Zone-level changes.",
+        "properties": {
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "masters": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "account_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`null` removes the zone from its account. Omit to leave unchanged."
+          },
+          "soa_edit_api": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "api_rectify": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "UserView": {
+        "allOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "object",
+            "required": [
+              "zones",
+              "account_ids"
+            ],
+            "properties": {
+              "zones": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "account_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        ],
+        "description": "A user with their access."
+      },
+      "ZoneDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ZoneSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "soa_edit_api",
+              "api_rectify",
+              "nsec3param",
+              "allowed_record_types",
+              "rrsets"
+            ],
+            "properties": {
+              "soa_edit_api": {
+                "type": "string"
+              },
+              "api_rectify": {
+                "type": "boolean"
+              },
+              "nsec3param": {
+                "type": "string"
+              },
+              "allowed_record_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Record types the editor may offer in this zone, from settings."
+              },
+              "rrsets": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        ],
+        "description": "A zone with its records."
+      },
+      "ZoneExport": {
+        "type": "object",
+        "description": "Zone file text.",
+        "required": [
+          "zone"
+        ],
+        "properties": {
+          "zone": {
+            "type": "string"
+          }
+        }
+      },
+      "ZonePage": {
+        "type": "object",
+        "description": "A page of zones.",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ZoneSummary": {
+        "type": "object",
+        "description": "A zone in a list.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "serial",
+          "dnssec",
+          "masters"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "dnssec": {
+            "type": "boolean"
+          },
+          "account": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "masters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

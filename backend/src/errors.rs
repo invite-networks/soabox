@@ -72,7 +72,7 @@ impl IntoResponse for PdnsError {
 }
 
 /// The standard error body for `/v1` and `/auth`.
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq, utoipa::ToSchema)]
 pub struct ErrorBody {
     /// Human-readable message, safe to show to a user.
     pub detail: String,
@@ -91,6 +91,10 @@ pub enum ApiError {
     Validation(String),
     #[error("sign in required")]
     Unauthenticated,
+    #[error("a one-time code is required")]
+    TotpRequired,
+    #[error("missing or invalid CSRF token")]
+    CsrfFailed,
     #[error("{0}")]
     Forbidden(String),
     #[error("{0} not found")]
@@ -118,6 +122,8 @@ impl ApiError {
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "BAD_REQUEST"),
             Self::Validation(_) => (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_ERROR"),
             Self::Unauthenticated => (StatusCode::UNAUTHORIZED, "UNAUTHENTICATED"),
+            Self::TotpRequired => (StatusCode::UNAUTHORIZED, "TOTP_REQUIRED"),
+            Self::CsrfFailed => (StatusCode::FORBIDDEN, "CSRF_FAILED"),
             Self::Forbidden(_) => (StatusCode::FORBIDDEN, "FORBIDDEN"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),

@@ -3,7 +3,7 @@
 use serde::Serialize;
 use sqlx::Row;
 
-use super::{Backend, Store, now};
+use super::{Store, now};
 
 /// An account.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -95,6 +95,44 @@ impl Store {
         }
     }
 
+    /// Every zone to account mapping, as zone name to (id, name).
+    pub async fn all_zone_accounts(
+        &self,
+    ) -> Result<std::collections::HashMap<String, (i64, String)>, sqlx::Error> {
+        sqlx::query(
+            "SELECT az.zone_name, a.id, a.name FROM account_zones az JOIN accounts a ON a.id = az.account_id",
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .iter()
+        .map(|r| Ok((r.try_get(0)?, (r.try_get(1)?, r.try_get(2)?))))
+        .collect()
+    }
+
+    /// Replaces the zones owned by an account.
+    pub async fn set_account_zones(&self, id: i64, zones: &[String]) -> Result<(), sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM account_zones WHERE account_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let mut zones: Vec<&String> = zones.iter().collect();
+        zones.sort();
+        zones.dedup();
+        for z in zones {
+            sqlx::query("DELETE FROM account_zones WHERE zone_name = $1")
+                .bind(z)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("INSERT INTO account_zones (account_id, zone_name) VALUES ($1, $2)")
+                .bind(id)
+                .bind(z)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await
+    }
+
     /// Zones owned by an account.
     pub async fn account_zones(&self, id: i64) -> Result<Vec<String>, sqlx::Error> {
         sqlx::query("SELECT zone_name FROM account_zones WHERE account_id = $1 ORDER BY zone_name")
@@ -155,28 +193,9 @@ impl Store {
         for sql in [
             "DELETE FROM account_zones WHERE zone_name = $1",
             "DELETE FROM api_key_zones WHERE zone_name = $1",
+            "DELETE FROM user_zones WHERE zone_name = $1",
         ] {
             sqlx::query(sql).bind(zone).execute(&mut *tx).await?;
-        }
-        if self.backend == Backend::Sqlite || self.backend == Backend::Postgres {
-            // user_zones exists from milestone 2 onward.
-            let has_user_zones = sqlx::query(match self.backend {
-                Backend::Sqlite => {
-                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'user_zones'"
-                }
-                Backend::Postgres => {
-                    "SELECT 1 FROM information_schema.tables WHERE table_name = 'user_zones'"
-                }
-            })
-            .fetch_optional(&mut *tx)
-            .await?
-            .is_some();
-            if has_user_zones {
-                sqlx::query("DELETE FROM user_zones WHERE zone_name = $1")
-                    .bind(zone)
-                    .execute(&mut *tx)
-                    .await?;
-            }
         }
         tx.commit().await
     }

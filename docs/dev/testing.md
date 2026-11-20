@@ -22,6 +22,13 @@ docker compose up -d pdns
 SOABOX_COMPAT_PDNS_URL=http://localhost:8081 SOABOX_COMPAT_PDNS_KEY=<PDNS_AUTH_API_KEY> \
   cargo nextest run --test compat --test-threads 1
 
+# OIDC sign-in against a mock provider
+docker run -d -p 127.0.0.1:28080:8080 -e 'JSON_CONFIG={"interactiveLogin":false}' ghcr.io/navikt/mock-oauth2-server:2.1.10
+SOABOX_TEST_OIDC_ISSUER=http://localhost:28080/default cargo nextest run --test oidc
+
+# OpenAPI spec drift (CI fails if openapi.json is stale)
+cargo run --quiet -- openapi > openapi.json
+
 # Postgres integration
 SOABOX_TEST_POSTGRES_URL=postgres://... cargo nextest run
 

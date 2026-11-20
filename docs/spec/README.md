@@ -6,6 +6,7 @@ The authoritative statement of what SOAbox does and how it is built.
 |---|---|
 | [Requirements](requirements.md) | Scope, actors, functional and nonfunctional requirements with stable IDs and acceptance criteria. |
 | [Design](design.md) | Components, interfaces, data model, security boundaries, deployment, and failure handling. |
+| [UI API contract](v1-api.md) | The `/auth` and `/v1` endpoints the browser UI uses. |
 | [Test plan](test-plan.md) | How each requirement is verified, and the release gates. |
 
 Maintenance rules:
