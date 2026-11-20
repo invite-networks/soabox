@@ -4,6 +4,7 @@ import { errorMessage } from "../../api/client";
 import { usePatchRrSets } from "../../api/hooks/zones";
 import type { RrSet, Zone } from "../../api/types";
 import { EDIT_ONLY_TYPES, toRelativeName } from "../../lib/dns";
+import { formatTtl } from "../../lib/format";
 import {
   type ChangeStatus,
   type PendingChanges,
@@ -34,6 +35,7 @@ import {
   Tr,
 } from "../ui";
 import { RrSetDialog } from "./rrset-dialog";
+import { RecordType } from "./zone-labels";
 
 const STATUS: Record<ChangeStatus, { label: string; tone: Tone }> = {
   added: { label: "Added", tone: "success" },
@@ -133,14 +135,19 @@ export function RecordsTab({ zone }: { zone: Zone }) {
       )}
       <Card flush>
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border p-3">
-          <div className="w-full max-w-sm">
-            <SearchField
-              label="Filter records"
-              hideLabel
-              placeholder="Filter records"
-              value={filter}
-              onChange={setFilter}
-            />
+          <div className="flex w-full max-w-md items-center gap-3">
+            <div className="flex-1">
+              <SearchField
+                label="Filter records"
+                hideLabel
+                placeholder="Filter records"
+                value={filter}
+                onChange={setFilter}
+              />
+            </div>
+            <span className="text-xs whitespace-nowrap text-fg-muted">
+              {visible.length === rows.length ? `${rows.length} RRsets` : `${visible.length} of ${rows.length} RRsets`}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {allowedTypes.length === 0 && (
@@ -175,10 +182,16 @@ export function RecordsTab({ zone }: { zone: Zone }) {
                 const label = `${relative} ${rrset.type}`;
                 return (
                   <Tr key={rrKey(rrset.name, rrset.type)} muted={status === "deleted"}>
-                    <RowHeader mono>{relative}</RowHeader>
-                    <Td mono>{rrset.type}</Td>
+                    <RowHeader mono>
+                      <span className={relative === "@" ? "text-fg-muted" : ""}>{relative}</span>
+                    </RowHeader>
+                    <Td>
+                      <RecordType type={rrset.type} />
+                    </Td>
                     <Td align="right" mono>
-                      {rrset.ttl}
+                      <span title={`${rrset.ttl} seconds`} className="text-fg-muted">
+                        {formatTtl(rrset.ttl)}
+                      </span>
                     </Td>
                     <Td mono wrap>
                       <ul className={status === "deleted" ? "line-through" : ""}>

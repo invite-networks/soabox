@@ -12,19 +12,20 @@ describe("dashboard", () => {
     await findHeading("Dashboard");
     expect(await screen.findByText("5.0.1")).toBeInTheDocument();
     expect(screen.getByText("1d 2h")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "3" })).toHaveAttribute("href", "/zones");
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse zones" })).toHaveAttribute("href", "/zones");
     expect(screen.getByRole("table", { name: "Recent changes" })).toBeInTheDocument();
   });
 
-  it("omits uptime when PowerDNS does not report it and handles no server", async () => {
+  it("shows unknown uptime when PowerDNS does not report it and handles no server", async () => {
     server.use(http.get("/v1/dashboard", () => json({ ...dashboard, server: { version: "5.0.1", uptime: null } })));
     const first = renderApp("/");
     expect(await screen.findByText("5.0.1")).toBeInTheDocument();
-    expect(screen.queryByText("Server uptime")).not.toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
     first.unmount();
     server.use(http.get("/v1/dashboard", () => json({ ...dashboard, server: null, recent_history: [] })));
     renderApp("/");
     expect(await screen.findByText("No changes yet")).toBeInTheDocument();
-    expect(screen.queryByText("PowerDNS version")).not.toBeInTheDocument();
+    expect(screen.getByText("Server did not respond")).toBeInTheDocument();
   });
 });

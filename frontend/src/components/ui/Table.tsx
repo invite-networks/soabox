@@ -22,7 +22,11 @@ export function Table({ label, children }: TableProps) {
 }
 
 export function THead({ children }: { children: ReactNode }) {
-  return <thead className="border-b border-border bg-surface-muted text-left text-xs text-fg-muted">{children}</thead>;
+  return (
+    <thead className="border-b border-border bg-surface-muted/70 text-left text-[11px] font-semibold tracking-wider text-fg-muted uppercase">
+      {children}
+    </thead>
+  );
 }
 
 export function TBody({ children }: { children: ReactNode }) {
@@ -30,7 +34,7 @@ export function TBody({ children }: { children: ReactNode }) {
 }
 
 export function Tr({ children, muted }: { children: ReactNode; muted?: boolean }) {
-  return <tr className={`hover:bg-surface-muted ${muted ? "text-fg-muted" : ""}`}>{children}</tr>;
+  return <tr className={`transition-colors hover:bg-surface-muted/60 ${muted ? "text-fg-muted" : ""}`}>{children}</tr>;
 }
 
 export interface ThProps {
@@ -42,7 +46,7 @@ export interface ThProps {
 
 export function Th({ children, align = "left", hidden }: ThProps) {
   return (
-    <th scope="col" className={`px-3 py-2 font-medium whitespace-nowrap ${align === "right" ? "text-right" : ""}`}>
+    <th scope="col" className={`px-4 py-2.5 font-semibold whitespace-nowrap ${align === "right" ? "text-right" : ""}`}>
       {hidden ? <span className="sr-only">{children}</span> : children}
     </th>
   );
@@ -61,7 +65,7 @@ export function Td({ children, align = "left", mono, wrap, colSpan }: TdProps) {
     <td
       {...(colSpan ? { colSpan } : {})}
       className={[
-        "px-3 py-1.5 align-top",
+        "px-4 py-2.5 align-top",
         align === "right" ? "text-right" : "",
         mono ? "font-mono text-[13px]" : "",
         wrap ? "break-all" : "whitespace-nowrap",
@@ -77,7 +81,7 @@ export function RowHeader({ children, mono }: { children: ReactNode; mono?: bool
   return (
     <th
       scope="row"
-      className={`px-3 py-1.5 text-left align-top font-normal whitespace-nowrap ${mono ? "font-mono text-[13px]" : ""}`}
+      className={`px-4 py-2.5 text-left align-top font-medium whitespace-nowrap ${mono ? "font-mono text-[13px]" : ""}`}
     >
       {children}
     </th>

@@ -19,11 +19,14 @@ import {
   Users,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { useDashboard } from "../api/hooks/dashboard";
 import { useLogout } from "../api/hooks/me";
 import type { Permission } from "../api/types";
 import { useMe } from "../lib/me-context";
 import { can } from "../lib/permissions";
 import { readThemeChoice, saveThemeChoice, type ThemeChoice } from "../lib/theme";
+import { APP_VERSION } from "../lib/version";
+import { Logo } from "./logo";
 import { Button, Drawer, Menu, MenuItem, MenuSection, MenuSeparator, MenuTrigger, NavLink } from "./ui";
 import { ZoneQuickSearch } from "./zone-quick-search";
 
@@ -75,11 +78,16 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     </li>
   );
   return (
-    <nav aria-label="Main" className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-      <ul className="flex flex-col gap-0.5">{visible(mainNav).map(link)}</ul>
+    <nav aria-label="Main" className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted uppercase">DNS</h2>
+        <ul className="flex flex-col gap-0.5">{visible(mainNav).map(link)}</ul>
+      </div>
       {admin.length > 0 && (
         <div className="flex flex-col gap-1">
-          <h2 className="px-2.5 text-xs font-medium tracking-wide text-fg-muted uppercase">Administration</h2>
+          <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-sidebar-muted uppercase">
+            Administration
+          </h2>
           <ul className="flex flex-col gap-0.5">{admin.map(link)}</ul>
         </div>
       )}
@@ -89,11 +97,32 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 function Brand() {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-5 text-base font-semibold text-fg">
-      <span aria-hidden className="flex size-6 items-center justify-center rounded bg-accent text-accent-fg">
-        <Globe className="size-4" />
-      </span>
-      SOAbox
+    <div className="flex h-14 shrink-0 items-center border-b border-sidebar-border px-5 text-white">
+      <Logo />
+    </div>
+  );
+}
+
+/** Connection state of the PowerDNS server, shown at the foot of the sidebar. */
+function ServerStatus() {
+  const dashboard = useDashboard();
+  const server = dashboard.data?.server ?? null;
+  const state = dashboard.isPending ? "checking" : server ? "connected" : "unreachable";
+  const dot = { checking: "bg-sidebar-muted", connected: "bg-emerald-400", unreachable: "bg-red-400" }[state];
+  return (
+    <div className="shrink-0 border-t border-sidebar-border px-5 py-3 text-xs text-sidebar-muted">
+      <p className="flex items-center gap-2 text-sidebar-fg">
+        <span
+          aria-hidden
+          className={`size-2 rounded-full ${dot} ${state === "connected" ? "shadow-[0_0_0_3px_rgb(52_211_153/0.18)]" : ""}`}
+        />
+        {state === "connected"
+          ? `PowerDNS ${server?.version ?? ""}`
+          : state === "checking"
+            ? "Checking PowerDNS"
+            : "PowerDNS unreachable"}
+      </p>
+      <p className="mt-1 pl-4">SOAbox {APP_VERSION}</p>
     </div>
   );
 }
@@ -129,7 +158,12 @@ function UserMenu() {
   return (
     <MenuTrigger>
       <Button variant="ghost" aria-label={`Account menu for ${me.user.display_name || me.user.username}`}>
-        <User aria-hidden />
+        <span
+          aria-hidden
+          className="flex size-6 items-center justify-center rounded-full bg-accent-soft text-accent-text [&_svg]:size-3.5"
+        >
+          <User aria-hidden />
+        </span>
         <span className="hidden max-w-40 truncate sm:inline">{me.user.display_name || me.user.username}</span>
         <ChevronDown aria-hidden />
       </Button>
@@ -169,15 +203,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border bg-surface md:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col bg-sidebar md:flex">
         <Brand />
         <SidebarNav />
+        <ServerStatus />
       </aside>
       <Drawer isOpen={drawerOpen} onOpenChange={setDrawerOpen} label="Navigation">
         <Brand />
         <SidebarNav onNavigate={() => setDrawerOpen(false)} />
+        <ServerStatus />
       </Drawer>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface px-4">
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-surface/85 px-4 backdrop-blur md:px-6">
         <span className="md:hidden">
           <Button variant="ghost" size="icon" aria-label="Open navigation" onPress={() => setDrawerOpen(true)}>
             <MenuIcon aria-hidden />
@@ -188,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <UserMenu />
         </div>
       </header>
-      <main id="main" className="mx-auto max-w-[1400px] p-4 md:p-6">
+      <main id="main" className="mx-auto max-w-[1400px] p-4 md:px-8 md:py-7">
         {children}
       </main>
     </div>

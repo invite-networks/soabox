@@ -6,7 +6,6 @@ import type { ServerItem } from "../../api/types";
 import { RequirePermission } from "../../components/forbidden";
 import {
   Card,
-  DetailList,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -25,6 +24,7 @@ import {
   Th,
   Tr,
 } from "../../components/ui";
+import { formatDuration } from "../../lib/format";
 
 const TABS = ["statistics", "configuration"] as const;
 
@@ -94,33 +94,77 @@ function ItemTable({ label, query }: { label: string; query: ReturnType<typeof u
   );
 }
 
+function statNumber(items: readonly ServerItem[] | undefined, name: string): number | null {
+  const item = items?.find((i) => i.name === name);
+  if (!item || typeof item.value !== "string" || !/^\d+$/.test(item.value)) {
+    return null;
+  }
+  return Number(item.value);
+}
+
+/** Headline numbers drawn from the PowerDNS statistics. */
+function Metrics({ items }: { items: readonly ServerItem[] | undefined }) {
+  const n = (name: string) => statNumber(items, name);
+  const sum = (...names: string[]) => {
+    const values = names.map(n);
+    return values.every((v) => v === null) ? null : values.reduce<number>((a, v) => a + (v ?? 0), 0);
+  };
+  const queries = sum("udp-queries", "tcp-queries");
+  const hit = n("packetcache-hit");
+  const miss = n("packetcache-miss");
+  const hitRate =
+    hit !== null && miss !== null && hit + miss > 0 ? `${((hit / (hit + miss)) * 100).toFixed(1)}%` : "No traffic";
+  const uptime = n("uptime");
+  const latency = n("latency");
+  const metrics = [
+    { label: "Uptime", value: uptime === null ? "Unknown" : formatDuration(uptime) },
+    { label: "Queries answered", value: queries === null ? "Unknown" : queries.toLocaleString() },
+    { label: "Packet cache hit rate", value: hitRate },
+    { label: "Average latency", value: latency === null ? "Unknown" : `${latency.toLocaleString()} µs` },
+    { label: "Zones in cache", value: n("zone-cache-size")?.toLocaleString() ?? "Unknown" },
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-5">
+      {metrics.map((m) => (
+        <div key={m.label} className="flex flex-col gap-1 bg-surface px-4 py-3 last:max-lg:col-span-2">
+          <dt className="text-[11px] font-semibold tracking-wider text-fg-muted uppercase">{m.label}</dt>
+          <dd className="text-lg font-semibold tracking-tight text-fg">{m.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function ServerPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const tab = search.tab ?? "statistics";
   const info = useServerInfo();
-  const statistics = useServerStatistics(tab === "statistics");
+  const statistics = useServerStatistics();
   const config = useServerConfig(tab === "configuration");
 
   return (
     <>
-      <PageHeader title="Server" description="Read-only view of the PowerDNS server." />
-      <div className="mb-4">
-        <Card>
-          {info.isPending ? (
-            <LoadingState />
-          ) : info.isError ? (
-            <ErrorState error={info.error} onRetry={() => void info.refetch()} />
+      <PageHeader
+        title="Server"
+        description={
+          info.data ? (
+            <span>
+              PowerDNS {info.data.daemon_type} <Mono>{info.data.version}</Mono> on server <Mono>{info.data.id}</Mono>.
+              Read only.
+            </span>
           ) : (
-            <DetailList
-              items={[
-                { label: "Server", value: <Mono>{info.data.id}</Mono> },
-                { label: "Daemon", value: info.data.daemon_type },
-                { label: "Version", value: <Mono>{info.data.version}</Mono> },
-              ]}
-            />
-          )}
-        </Card>
+            "Read-only view of the PowerDNS server."
+          )
+        }
+      />
+      {info.isError && (
+        <div className="mb-4">
+          <ErrorState error={info.error} onRetry={() => void info.refetch()} />
+        </div>
+      )}
+      <div className="mb-6">
+        <Metrics items={statistics.data} />
       </div>
       <Tabs
         selectedKey={tab}

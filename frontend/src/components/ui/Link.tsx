@@ -44,7 +44,7 @@ export interface NavLinkProps {
   onPress?: () => void;
 }
 
-/** A sidebar navigation link. The current page uses the accent color and `aria-current`. */
+/** A link in the dark sidebar. The current page gets an accent bar and `aria-current`. */
 export function NavLink({ href, children, isCurrent, onPress }: NavLinkProps) {
   return (
     <RACLink
@@ -52,11 +52,11 @@ export function NavLink({ href, children, isCurrent, onPress }: NavLinkProps) {
       {...(onPress ? { onPress } : {})}
       {...(isCurrent ? { "aria-current": "page" as const } : {})}
       className={[
-        "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm cursor-pointer [&_svg]:size-4",
-        focusRing,
+        "relative flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13px] cursor-pointer transition-colors [&_svg]:size-4",
+        "outline-none focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-sidebar-accent",
         isCurrent
-          ? "bg-accent-soft font-medium text-accent-text"
-          : "text-fg-muted hovered:bg-surface-hover hovered:text-fg",
+          ? "bg-sidebar-active font-medium text-white before:absolute before:inset-y-1.5 before:-left-3 before:w-0.5 before:rounded-r before:bg-sidebar-accent [&_svg]:text-sidebar-accent"
+          : "text-sidebar-muted hovered:bg-sidebar-hover hovered:text-sidebar-fg",
       ].join(" ")}
     >
       {children}

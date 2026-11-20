@@ -2,11 +2,15 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import pkg from "./package.json" with { type: "json" };
 
 const backend = process.env["SOABOX_DEV_BACKEND"] ?? "http://localhost:8080";
 const isVitest = process.env["VITEST"] !== undefined;
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     // The router plugin must come before the React plugin. Tests use the committed route tree.
     ...(isVitest ? [] : [tanstackRouter({ target: "react", autoCodeSplitting: true })]),

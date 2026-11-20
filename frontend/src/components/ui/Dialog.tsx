@@ -71,7 +71,7 @@ export interface DrawerProps {
 export function Drawer({ isOpen, onOpenChange, label, children }: DrawerProps) {
   return (
     <ModalOverlay isOpen={isOpen} onOpenChange={onOpenChange} isDismissable className="fixed inset-0 z-50 bg-overlay">
-      <Modal className="h-full w-64 max-w-[85vw] border-r border-border bg-surface shadow-xl">
+      <Modal className="h-full w-64 max-w-[85vw] border-r border-sidebar-border bg-sidebar shadow-xl">
         <RACDialog aria-label={label} className="flex h-full flex-col outline-none">
           {children}
         </RACDialog>
