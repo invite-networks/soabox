@@ -4,11 +4,11 @@ Goal: SOAbox runs in front of PowerDNS Authoritative 5.x and serves the full pdn
 
 No UI in this milestone. API keys and accounts are managed with the `soabox` CLI until milestone 4.
 
-See the [design document](../design.md) for the overall architecture, or go back to the [README](../../README.md).
+See the [design document](../spec/design.md) for the overall architecture, or go back to the [README](../../README.md).
 
 ## Exit Criteria
 
-- `docker compose up` in `deploy/` starts pdns 5 and SOAbox, and `pdnsutil`-equivalent workflows work through SOAbox with a SOAbox key.
+- `docker compose up` at the repository root starts pdns 5 and SOAbox, and `pdnsutil`-equivalent workflows work through SOAbox with a SOAbox key.
 - The compatibility suite passes against a real pdns 5 instance.
 - Scoped keys only see and change their own zones, and out-of-scope zones look like missing zones.
 - Every successful and failed zone write has a history row with an RRset diff.
@@ -20,7 +20,7 @@ See the [design document](../design.md) for the overall architecture, or go back
 - `backend/` crate `soabox`, edition 2024, library plus `src/bin/soabox.rs`. Layout: `config.rs`, `errors.rs`, `db/`, `pdns/`, `auth/`, `authz/`, `audit/`, `api/` (passthrough), `cli/`.
 - `rust-toolchain.toml` (stable), `rustfmt.toml`, clippy lints in `Cargo.toml`, `deny.toml` (license allowlist compatible with Apache-2.0).
 - `.env.example` with every `SOABOX_` variable.
-- `deploy/compose.yaml`: pdns-auth 5.x (SQLite backend, API enabled, tag pinned) and SOAbox, bind mounts under `deploy/data/`.
+- `compose.yaml` at the repository root: pdns-auth 5.x (SQLite backend, API enabled, tag pinned) and SOAbox, bind mounts under the top-level `data/`.
 - GitHub Actions workflow: fmt, clippy, nextest, doc tests, coverage, audit, deny, and the compat suite with pdns as a service container.
 
 ## Task 2: Config, Errors, Logging, Client IP
@@ -39,11 +39,12 @@ See the [design document](../design.md) for the overall architecture, or go back
 - Tables for this milestone:
   - `accounts` (id, name, description, created_at)
   - `account_zones` (account_id, zone_name)
-  - `api_keys` (id, prefix, hash, description, role, can_create_zones, account_id, expires_at, last_used_at, created_at, disabled)
-  - `api_key_zones` (api_key_id, zone_name)
+  - `api_keys` (id, key_hash, hint, description, role, create_account_id, expires_at, last_used_at, created_at, disabled)
+  - `api_key_zones` (api_key_id, zone_name) and `api_key_accounts` (api_key_id, account_id)
   - `api_key_networks` (api_key_id, cidr)
   - `history` (id, at, actor_type, actor_id, actor_name, client_ip, operation, zone_name, status, upstream_status, diff_json, detail_json)
-- Users, sessions, and settings tables arrive in milestone 2. `history.actor_type` already allows `user` and `api_key`.
+  - `settings` (key, value)
+- Users and sessions tables arrive in milestone 2. `history.actor_type` already allows `user` and `api_key`.
 - Repository layer behind traits so services can be tested with fakes. Integration tests run against both SQLite and Postgres in CI.
 
 ## Task 4: pdns Client
@@ -56,8 +57,8 @@ See the [design document](../design.md) for the overall architecture, or go back
 
 ## Task 5: API Keys
 
-- Key format: random 32-byte secret, base64url, with a short public prefix used for lookup. Stored as an argon2id hash. Constant-time verification.
-- Roles: `admin`, `operator`, `scoped`. Scoped keys carry zones, accounts, and an optional `can_create_zones` flag tied to an account.
+- Key format: random 32-byte secret, base64url, no prefix. Stored as a SHA-256 digest and looked up by digest ([ADR-0013](../adr/0013-api-key-hashing.md)).
+- Roles: `admin`, `operator`, `scoped`. Scoped keys carry zones and accounts. Setting `create_account_id` lets a scoped key create zones in that account.
 - Optional expiry and CIDR allowlist checked against the resolved client IP.
 - `last_used_at` updated at most once a minute per key to avoid write load.
 - Failed authentication is rate limited per client IP. Responses match pdns (`401` with pdns body).
@@ -75,7 +76,7 @@ See the [design document](../design.md) for the overall architecture, or go back
 - Policy:
   - `admin`: everything, including paths not in the table, so new pdns endpoints keep working.
   - `operator`: all zone classes, read-only server statistics and config, no tsigkey, autoprimary, or cache writes.
-  - `scoped`: zone classes for zones in scope only. Zone create only with `can_create_zones`. No server admin classes.
+  - `scoped`: zone classes for zones in scope only. Zone create only with a `create_account_id`. No server admin classes.
   - Non-admin keys are denied on unknown paths.
 - `server_id` other than the configured one returns pdns's `404` for an unknown server.
 - Out-of-scope zones return the same `404` body pdns returns for a missing zone.
@@ -101,7 +102,7 @@ See the [design document](../design.md) for the overall architecture, or go back
 
 ## Task 9: Compatibility Suite
 
-- Location: `tests/compat/`, run with nextest when `SOABOX_COMPAT_PDNS_URL` is set (CI provides pdns as a service).
+- Location: `backend/tests/compat.rs`, run with nextest when `SOABOX_COMPAT_PDNS_URL` is set (CI provides pdns as a service).
 - Each case runs the same request against pdns directly with the real key and against SOAbox with an admin key, then compares status, `Content-Type`, and the parsed JSON body.
 - Write cases use twin zones (`a-<case>.test.` direct, `b-<case>.test.` through SOAbox) and compare the resulting zones after normalizing the zone name.
 - Coverage: discovery endpoints, zone CRUD for each kind, rrset PATCH (replace, delete, extend, prune where supported), comments, notify, export, rectify, cryptokeys, metadata, tsigkeys, search, statistics, config, error cases (bad JSON, missing zone, bad key, wrong server id).
