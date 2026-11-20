@@ -58,7 +58,7 @@ flowchart TD
     core --> db[("SQLite or Postgres")]
 ```
 
-Built with Rust (Axum) on the backend and React on the frontend. Details are in the [design document](docs/design.md).
+Built with Rust (Axum) on the backend and React on the frontend. Details are in the [design document](docs/spec/design.md).
 
 ## Roadmap
 
@@ -73,8 +73,10 @@ Built with Rust (Axum) on the backend and React on the frontend. Details are in 
 
 ## Documentation
 
-- [Design](docs/design.md): architecture, API compatibility rules, authentication, roles, and configuration
-- [Milestone 1 plan](docs/plans/milestone-1-passthrough.md): the PowerDNS-compatible API
+- [Documentation index](docs/README.md): specifications, diagrams, decisions, developer docs, runbooks, and guides
+- [Requirements](docs/spec/requirements.md) and [design](docs/spec/design.md)
+- [API guide](docs/guides/api-guide.md): connecting tools to the PowerDNS-compatible API
+- [Configuration](docs/dev/configuration.md)
 
 ## License
 
