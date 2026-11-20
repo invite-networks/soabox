@@ -307,7 +307,7 @@ function ApiKeysPage() {
   const [dialog, setDialog] = useState<{ open: boolean; editing: ApiKey | null }>({ open: false, editing: null });
   const [secret, setSecret] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ApiKey | null>(null);
-  const apiExample = `curl -H "X-API-Key: $SOABOX_KEY" \\\n  ${window.location.origin}/api/v1/servers/localhost/zones`;
+  const apiExample = `curl -H "X-API-Key: $SOABOX_KEY" ${window.location.origin}/api/v1/servers/localhost/zones`;
 
   return (
     <>
