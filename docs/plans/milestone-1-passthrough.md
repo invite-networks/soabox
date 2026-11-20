@@ -4,7 +4,7 @@ Goal: SOAbox runs in front of PowerDNS Authoritative 5.x and serves the full pdn
 
 No UI in this milestone. API keys and accounts are managed with the `soabox` CLI until milestone 4.
 
-See [design](../design.md) for the overall architecture.
+See the [design document](../design.md) for the overall architecture, or go back to the [README](../../README.md).
 
 ## Exit Criteria
 

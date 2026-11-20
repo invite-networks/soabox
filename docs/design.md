@@ -1,7 +1,9 @@
 # SOAbox Design
 
 Status: Draft, v0.x (rapid development)
-License: Apache-2.0
+License: [Apache-2.0](../LICENSE)
+
+Back to the [README](../README.md). Implementation plans: [Milestone 1](plans/milestone-1-passthrough.md).
 
 SOAbox is a web interface and API gateway for PowerDNS Authoritative Server 5.x. It replaces PowerDNS-Admin with a Rust backend and a React frontend. It has two jobs:
 
@@ -26,22 +28,21 @@ Non-goals (v0.x)
 
 ## Architecture
 
-```
-            reverse proxy (TLS offload, sets X-Forwarded-*)
-                               |
-                         SOAbox (Axum)
-     +----------------+--------+---------+-----------------+
-     |                |                  |                 |
-  /api/*           /v1/*             /auth/*            /* (SPA)
-  pdns-compatible  UI API            local + OIDC       built React app
-  X-API-Key        session cookie    sign-in flows      ServeDir + index fallback
-     |                |
-     +------ core ----+
-             |  authz (roles, zone scope)
-             |  audit (before / after diff)
-             |  pdns client (reqwest, real API key)
-             v
-     PowerDNS Authoritative 5.x HTTP API
+```mermaid
+flowchart TD
+    proxy["Reverse proxy<br/>TLS offload, sets X-Forwarded-*"] --> axum["SOAbox (Axum)"]
+    axum --> api["/api/*<br/>pdns-compatible<br/>X-API-Key"]
+    axum --> v1["/v1/*<br/>UI API<br/>session cookie"]
+    axum --> auth["/auth/*<br/>local and OIDC<br/>sign-in flows"]
+    axum --> spa["/* <br/>built React app<br/>ServeDir with index fallback"]
+    api --> core
+    v1 --> core
+    subgraph core["Core"]
+        authz["Authorization<br/>roles, zone scope"]
+        audit["Audit<br/>before and after diff"]
+        client["pdns client<br/>real API key"]
+    end
+    core --> pdns["PowerDNS Authoritative 5.x HTTP API"]
 ```
 
 - `/api/...` is the passthrough. It mirrors the pdns path space exactly.
