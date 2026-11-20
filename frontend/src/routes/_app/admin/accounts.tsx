@@ -24,14 +24,12 @@ import {
   Table,
   TBody,
   Td,
-  TextAreaField,
   TextField,
   THead,
   Th,
   Tr,
 } from "../../../components/ui";
-import { isHostname } from "../../../lib/dns";
-import { joinList, splitList } from "../../../lib/format";
+import { ZonePickerField } from "../../../components/zone-picker";
 
 export const Route = createFileRoute("/_app/admin/accounts")({
   component: () => (
@@ -56,9 +54,9 @@ function AccountDialog({
   const mutation = editing ? update : create;
   const [name, setName] = useState(editing?.name ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
-  const [zones, setZones] = useState(joinList(editing?.zones ?? []));
+  const [zones, setZones] = useState<string[]>(editing?.zones ?? []);
   const [members, setMembers] = useState<string[]>((editing?.user_ids ?? []).map(String));
-  const [errors, setErrors] = useState<{ name?: string; zones?: string }>({});
+  const [nameError, setNameError] = useState<string | undefined>();
 
   return (
     <Dialog
@@ -70,18 +68,11 @@ function AccountDialog({
       <Form
         label="Account"
         onSubmit={() => {
-          const zoneList = splitList(zones);
-          const next: { name?: string; zones?: string } = {};
           if (!name.trim()) {
-            next.name = "Enter a name.";
-          }
-          if (!zoneList.every((z) => isHostname(z))) {
-            next.zones = "Enter one zone name per line.";
-          }
-          setErrors(next);
-          if (next.name || next.zones) {
+            setNameError("Enter a name.");
             return;
           }
+          setNameError(undefined);
           if (editing) {
             update.mutate(
               {
@@ -89,7 +80,7 @@ function AccountDialog({
                 body: {
                   name: name.trim(),
                   description,
-                  zones: zoneList.map((z) => (z.endsWith(".") ? z : `${z}.`)),
+                  zones,
                   user_ids: members.map(Number),
                 },
               },
@@ -101,18 +92,11 @@ function AccountDialog({
         }}
       >
         {mutation.isError && <Alert tone="danger">{errorMessage(mutation.error)}</Alert>}
-        <TextField label="Name" value={name} onChange={setName} errorMessage={errors.name} />
+        <TextField label="Name" value={name} onChange={setName} errorMessage={nameError} />
         <TextField label="Description" value={description} onChange={setDescription} />
         {editing && (
           <>
-            <TextAreaField
-              label="Zones"
-              description="One zone per line."
-              value={zones}
-              onChange={setZones}
-              errorMessage={errors.zones}
-              mono
-            />
+            <ZonePickerField value={zones} onChange={setZones} />
             <CheckboxGroupField
               label="Members"
               value={members}

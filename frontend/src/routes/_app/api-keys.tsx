@@ -30,6 +30,7 @@ import {
   RowActions,
   RowHeader,
   SelectField,
+  Stack,
   Table,
   TBody,
   Td,
@@ -39,7 +40,7 @@ import {
   Th,
   Tr,
 } from "../../components/ui";
-import { isHostname } from "../../lib/dns";
+import { ZonePickerField } from "../../components/zone-picker";
 import { dateToUnix, formatTime, joinList, splitList, unixToDate } from "../../lib/format";
 import { useMe } from "../../lib/me-context";
 
@@ -59,7 +60,7 @@ const ROLE_LABELS: Record<ApiKeyRole, string> = { admin: "Admin", operator: "Ope
 const schema = z.object({
   description: z.string().trim().min(1, "Describe what the key is for."),
   role: z.enum(["admin", "operator", "scoped"]),
-  zones: z.string().refine((v) => splitList(v).every((z) => isHostname(z)), "Enter one zone name per line."),
+  zones: z.array(z.string()),
   accountIds: z.array(z.string()),
   createAccount: z.string(),
   networks: z
@@ -76,7 +77,7 @@ function toValues(key: ApiKey | null): Values {
   return {
     description: key?.description ?? "",
     role: key?.role ?? "scoped",
-    zones: joinList(key?.zones ?? []),
+    zones: key?.zones ?? [],
     accountIds: (key?.account_ids ?? []).map(String),
     createAccount: key?.create_account_id ? String(key.create_account_id) : NONE,
     networks: joinList(key?.networks ?? []),
@@ -90,7 +91,7 @@ export function toApiKeyInput(values: Values): ApiKeyInput {
   return {
     description: values.description.trim(),
     role: values.role,
-    zones: scoped ? splitList(values.zones).map((z) => (z.endsWith(".") ? z : `${z}.`)) : [],
+    zones: scoped ? values.zones : [],
     account_ids: scoped ? values.accountIds.map(Number) : [],
     create_account_id: scoped && values.createAccount !== NONE ? Number(values.createAccount) : null,
     networks: splitList(values.networks),
@@ -184,15 +185,11 @@ function ApiKeyDialog({
             <Controller
               control={form.control}
               name="zones"
-              render={({ field, fieldState }) => (
-                <TextAreaField
-                  label="Zones"
-                  description="One zone per line. The key can act on these zones."
+              render={({ field }) => (
+                <ZonePickerField
+                  description="The key can act on these zones."
                   value={field.value}
                   onChange={field.onChange}
-                  inputRef={field.ref}
-                  errorMessage={fieldState.error?.message}
-                  mono
                 />
               )}
             />
@@ -310,6 +307,7 @@ function ApiKeysPage() {
   const [dialog, setDialog] = useState<{ open: boolean; editing: ApiKey | null }>({ open: false, editing: null });
   const [secret, setSecret] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ApiKey | null>(null);
+  const apiExample = `curl -H "X-API-Key: $SOABOX_KEY" \\\n  ${window.location.origin}/api/v1/servers/localhost/zones`;
 
   return (
     <>
@@ -328,77 +326,89 @@ function ApiKeysPage() {
           <Alert tone="danger">{errorMessage(action.error)}</Alert>
         </div>
       )}
-      <Card flush>
-        {keys.isPending ? (
-          <LoadingState />
-        ) : keys.isError ? (
-          <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
-        ) : keys.data.length === 0 ? (
-          <EmptyState title="No API keys yet" />
-        ) : (
-          <Table label="API keys">
-            <THead>
-              <tr>
-                <Th>Key</Th>
-                <Th>Description</Th>
-                <Th>Role</Th>
-                <Th>Scope</Th>
-                <Th>Expires</Th>
-                <Th>Last used</Th>
-                <Th>Status</Th>
-                <Th hidden>Actions</Th>
-              </tr>
-            </THead>
-            <TBody>
-              {keys.data.map((k) => (
-                <Tr key={k.id}>
-                  <RowHeader>
-                    <Mono>...{k.hint}</Mono>
-                  </RowHeader>
-                  <Td wrap>{k.description}</Td>
-                  <Td>{ROLE_LABELS[k.role] ?? k.role}</Td>
-                  <Td>
-                    {k.role === "scoped"
-                      ? `${k.zones.length} ${k.zones.length === 1 ? "zone" : "zones"}, ${k.account_ids.length} ${k.account_ids.length === 1 ? "account" : "accounts"}`
-                      : "All zones"}
-                  </Td>
-                  <Td>{k.expires_at ? formatTime(k.expires_at) : "Never"}</Td>
-                  <Td>{formatTime(k.last_used_at)}</Td>
-                  <Td>
-                    <KeyStatus apiKey={k} />
-                  </Td>
-                  <Td align="right">
-                    <RowActions>
-                      <Button
-                        size="sm"
-                        onPress={() => action.mutate({ id: k.id, action: k.disabled ? "enable" : "disable" })}
-                      >
-                        {k.disabled ? "Enable" : "Disable"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Edit key ...${k.hint}`}
-                        onPress={() => setDialog({ open: true, editing: k })}
-                      >
-                        <Pencil aria-hidden />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete key ...${k.hint}`}
-                        onPress={() => setDeleting(k)}
-                      >
-                        <Trash2 aria-hidden />
-                      </Button>
-                    </RowActions>
-                  </Td>
-                </Tr>
-              ))}
-            </TBody>
-          </Table>
-        )}
-      </Card>
+      <Stack gap="lg">
+        <Card flush>
+          {keys.isPending ? (
+            <LoadingState />
+          ) : keys.isError ? (
+            <ErrorState error={keys.error} onRetry={() => void keys.refetch()} />
+          ) : keys.data.length === 0 ? (
+            <EmptyState title="No API keys yet" />
+          ) : (
+            <Table label="API keys">
+              <THead>
+                <tr>
+                  <Th>Key</Th>
+                  <Th>Description</Th>
+                  <Th>Role</Th>
+                  <Th>Scope</Th>
+                  <Th>Expires</Th>
+                  <Th>Last used</Th>
+                  <Th>Status</Th>
+                  <Th hidden>Actions</Th>
+                </tr>
+              </THead>
+              <TBody>
+                {keys.data.map((k) => (
+                  <Tr key={k.id}>
+                    <RowHeader>
+                      <Mono>...{k.hint}</Mono>
+                    </RowHeader>
+                    <Td wrap>{k.description}</Td>
+                    <Td>{ROLE_LABELS[k.role] ?? k.role}</Td>
+                    <Td>
+                      {k.role === "scoped"
+                        ? `${k.zones.length} ${k.zones.length === 1 ? "zone" : "zones"}, ${k.account_ids.length} ${k.account_ids.length === 1 ? "account" : "accounts"}`
+                        : "All zones"}
+                    </Td>
+                    <Td>{k.expires_at ? formatTime(k.expires_at) : "Never"}</Td>
+                    <Td>{formatTime(k.last_used_at)}</Td>
+                    <Td>
+                      <KeyStatus apiKey={k} />
+                    </Td>
+                    <Td align="right">
+                      <RowActions>
+                        <Button
+                          size="sm"
+                          onPress={() => action.mutate({ id: k.id, action: k.disabled ? "enable" : "disable" })}
+                        >
+                          {k.disabled ? "Enable" : "Disable"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Edit key ...${k.hint}`}
+                          onPress={() => setDialog({ open: true, editing: k })}
+                        >
+                          <Pencil aria-hidden />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Delete key ...${k.hint}`}
+                          onPress={() => setDeleting(k)}
+                        >
+                          <Trash2 aria-hidden />
+                        </Button>
+                      </RowActions>
+                    </Td>
+                  </Tr>
+                ))}
+              </TBody>
+            </Table>
+          )}
+        </Card>
+        <Card title="Using the PowerDNS API">
+          <div className="flex flex-col gap-3 text-sm text-fg-muted">
+            <p>
+              Existing PowerDNS tools work unchanged. Point them at SOAbox and send a SOAbox API key in the{" "}
+              <Mono>X-API-Key</Mono> header. Every change is checked against the key&apos;s scope and recorded in
+              history.
+            </p>
+            <CodeBlock label="Example request">{apiExample}</CodeBlock>
+          </div>
+        </Card>
+      </Stack>
       <ApiKeyDialog
         editing={dialog.editing}
         isOpen={dialog.open}

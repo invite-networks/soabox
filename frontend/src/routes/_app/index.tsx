@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Clock, FileStack, Globe, KeyRound, type LucideIcon, Plus, Server, ShieldCheck } from "lucide-react";
+import { Clock, Globe, type LucideIcon, Plus, Server, ShieldCheck } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useDashboard } from "../../api/hooks/dashboard";
 import { CreateZoneDialog } from "../../components/create-zone-dialog";
 import { HistoryTable } from "../../components/history-table";
-import { Button, Card, CodeBlock, EmptyState, ErrorState, Link, LoadingState, PageHeader } from "../../components/ui";
+import { Button, Card, EmptyState, ErrorState, Link, LoadingState, PageHeader } from "../../components/ui";
 import { formatDuration } from "../../lib/format";
 import { useMe } from "../../lib/me-context";
 import { can } from "../../lib/permissions";
@@ -56,7 +56,6 @@ function DashboardPage() {
   const dashboard = useDashboard();
   const [createOpen, setCreateOpen] = useState(false);
   const name = me.user.display_name || me.user.username;
-  const apiExample = `curl -H "X-API-Key: $SOABOX_KEY" \\\n  ${window.location.origin}/api/v1/servers/localhost/zones`;
 
   return (
     <>
@@ -104,53 +103,17 @@ function DashboardPage() {
             </Stat>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="min-w-0">
-              <Card
-                title="Recent changes"
-                flush
-                {...(can(me, "view_history") ? { actions: <Link href="/history">View all history</Link> } : {})}
-              >
-                {dashboard.data.recent_history.length === 0 ? (
-                  <EmptyState title="No changes yet">Changes to zones and records will appear here.</EmptyState>
-                ) : (
-                  <HistoryTable entries={dashboard.data.recent_history} label="Recent changes" />
-                )}
-              </Card>
-            </div>
-            <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:grid-cols-2 2xl:grid-cols-1">
-              <Card title="Shortcuts">
-                <ul className="flex flex-col gap-1">
-                  {[
-                    { href: "/zones", label: "Manage zones", icon: Globe, show: true },
-                    { href: "/templates", label: "Zone templates", icon: FileStack, show: true },
-                    { href: "/api-keys", label: "API keys", icon: KeyRound, show: can(me, "create_api_keys") },
-                    { href: "/server", label: "Server statistics", icon: Activity, show: can(me, "view_server") },
-                  ]
-                    .filter((item) => item.show)
-                    .map((item) => (
-                      <li key={item.href}>
-                        <Link href={item.href}>
-                          <span className="flex items-center gap-2 py-1">
-                            <item.icon aria-hidden className="size-4" />
-                            {item.label}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                </ul>
-              </Card>
-              <Card title="PowerDNS API">
-                <div className="flex flex-col gap-3 text-sm text-fg-muted">
-                  <p>
-                    Existing PowerDNS tools work unchanged. Point them at SOAbox and use a SOAbox API key. Every change
-                    is checked against your permissions and recorded in history.
-                  </p>
-                  <CodeBlock label="Example request">{apiExample}</CodeBlock>
-                </div>
-              </Card>
-            </div>
-          </div>
+          <Card
+            title="Recent changes"
+            flush
+            {...(can(me, "view_history") ? { actions: <Link href="/history">View all history</Link> } : {})}
+          >
+            {dashboard.data.recent_history.length === 0 ? (
+              <EmptyState title="No changes yet">Changes to zones and records will appear here.</EmptyState>
+            ) : (
+              <HistoryTable entries={dashboard.data.recent_history} label="Recent changes" />
+            )}
+          </Card>
         </div>
       )}
       <CreateZoneDialog isOpen={createOpen} onOpenChange={setCreateOpen} />

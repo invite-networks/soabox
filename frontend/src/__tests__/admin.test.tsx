@@ -3,7 +3,7 @@ import { http } from "msw";
 import { describe, expect, it } from "vitest";
 import { accounts, settings, tsigKeys, users } from "../test/fixtures";
 import { apiError, json, noContent } from "../test/handlers";
-import { findHeading, renderApp } from "../test/render";
+import { findHeading, pickZone, renderApp } from "../test/render";
 import { recordMutations, server } from "../test/server";
 
 function rowFor(table: HTMLElement, name: string) {
@@ -97,7 +97,7 @@ describe("users", () => {
     await user.click(within(rowFor(table, "bob")).getByRole("button", { name: "Actions for bob" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
     const edit = await screen.findByRole("dialog", { name: "Edit bob" });
-    await user.type(within(edit).getByLabelText("Zones"), "\nexample.com");
+    await pickZone(user, edit, "example.com.");
     await user.click(within(edit).getByRole("checkbox", { name: "Web" }));
     await user.click(within(edit).getByRole("button", { name: /Status/ }));
     await user.click(await screen.findByRole("option", { name: "Disabled" }));
@@ -150,11 +150,10 @@ describe("accounts", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit Ops" }));
     dialog = await screen.findByRole("dialog", { name: "Edit Ops" });
-    await user.type(within(dialog).getByLabelText("Zones"), "\nbad zone");
-    await user.click(within(dialog).getByRole("button", { name: "Save account" }));
-    expect(within(dialog).getByText("Enter one zone name per line.")).toBeInTheDocument();
-    await user.clear(within(dialog).getByLabelText("Zones"));
-    await user.type(within(dialog).getByLabelText("Zones"), "example.com.\nexample.org");
+    await user.click(within(dialog).getByRole("button", { name: "Remove example.com." }));
+    expect(within(dialog).getByText("None selected.")).toBeInTheDocument();
+    await pickZone(user, dialog, "example.org.");
+    await pickZone(user, dialog, "example.com.");
     await user.click(await within(dialog).findByRole("checkbox", { name: "Admin" }));
     await user.click(within(dialog).getByRole("button", { name: "Save account" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -166,7 +165,7 @@ describe("accounts", () => {
 
     expect(calls.slice(0, 2).map((c) => c.body)).toEqual([
       { name: "DNS team", description: "Shared zones" },
-      { name: "Ops", description: "Operations team", zones: ["example.com.", "example.org."], user_ids: [2, 1] },
+      { name: "Ops", description: "Operations team", zones: ["example.org.", "example.com."], user_ids: [2, 1] },
     ]);
   });
 });
