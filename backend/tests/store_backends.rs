@@ -102,6 +102,31 @@ async fn exercise(s: &Store) {
     assert_eq!(s.zone_account(&zone).await.expect("q"), None);
     assert!(s.delete_api_key(id).await.expect("delete"));
     assert!(s.delete_account(acct).await.expect("delete account"));
+
+    let uid = s
+        .create_user(&soabox::store::NewUser {
+            username: format!("totp-{suffix}"),
+            display_name: String::new(),
+            email: String::new(),
+            role: soabox::store::UserRole::User,
+            auth_source: "local",
+            oidc_issuer: None,
+            oidc_subject: None,
+            password_hash: None,
+            status: soabox::store::UserStatus::Active,
+        })
+        .await
+        .expect("user");
+    let (a, b) = tokio::join!(s.consume_totp_step(uid, 7), s.consume_totp_step(uid, 7));
+    assert_eq!(
+        [a.expect("a"), b.expect("b")]
+            .iter()
+            .filter(|w| **w)
+            .count(),
+        1,
+        "a TOTP step is consumed once"
+    );
+    assert!(!s.consume_totp_step(uid, 6).await.expect("older"));
 }
 
 #[tokio::test]

@@ -333,6 +333,50 @@ async fn totp_enrollment_and_sign_in() {
     )
     .await;
     assert_eq!(r.status, 200);
+
+    // Wrong codes count against the account-wide limit, not only the client,
+    // so guesses spread across many addresses still lock the account. The
+    // replayed code above already counted once, so 98 more leaves one below
+    // the limit of 100.
+    for _ in 0..98 {
+        h.state.login_users.fail(&["user:tina"]);
+    }
+    assert!(!h.state.login_users.blocked(&["user:tina"]));
+    let r = send(
+        &h,
+        "POST",
+        "/auth/login",
+        None,
+        Some(
+            json!({"username": "tina", "password": "correct-horse-battery", "totp_code": "000000"}),
+        ),
+        false,
+    )
+    .await;
+    assert_eq!(r.status, 401);
+    assert!(
+        h.state.login_users.blocked(&["user:tina"]),
+        "a wrong TOTP code reaches the account limiter"
+    );
+}
+
+#[tokio::test]
+async fn totp_steps_are_consumed_once() {
+    let pdns = MockServer::start().await;
+    let h = Harness::new(&pdns.uri()).await;
+    let uid = user(&h, "once", UserRole::User, UserStatus::Active).await;
+    let store = &h.state.store;
+    let (a, b) = tokio::join!(
+        store.consume_totp_step(uid, 42),
+        store.consume_totp_step(uid, 42)
+    );
+    let wins = [a.expect("a"), b.expect("b")]
+        .iter()
+        .filter(|w| **w)
+        .count();
+    assert_eq!(wins, 1, "exactly one concurrent request consumes a step");
+    assert!(!store.consume_totp_step(uid, 41).await.expect("older"));
+    assert!(store.consume_totp_step(uid, 43).await.expect("newer"));
 }
 
 #[tokio::test]

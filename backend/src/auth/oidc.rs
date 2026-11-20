@@ -9,10 +9,11 @@ use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use base64::Engine;
-use openidconnect::core::{CoreAuthenticationFlow, CoreClient};
+use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreIdTokenClaims};
 use openidconnect::{
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
+    AuthorizationCode, ClaimsVerificationError, ClientId, ClientSecret, CsrfToken, Nonce,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, SignatureVerificationError,
+    TokenResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +70,16 @@ async fn client(state: &AppState) -> Result<(OidcConfig, Client), ApiError> {
         .await?
         .ok_or_else(|| ApiError::NotFound("single sign-on".into()))?;
     let meta = state.oidc_metadata.get(&cfg.issuer).await?;
-    let client = CoreClient::from_provider_metadata(
+    let client = build_client(state, &cfg, meta)?;
+    Ok((cfg, client))
+}
+
+fn build_client(
+    state: &AppState,
+    cfg: &OidcConfig,
+    meta: openidconnect::core::CoreProviderMetadata,
+) -> Result<Client, ApiError> {
+    Ok(CoreClient::from_provider_metadata(
         meta,
         ClientId::new(cfg.client_id.clone()),
         Some(ClientSecret::new(cfg.client_secret.expose().to_owned())),
@@ -77,8 +87,7 @@ async fn client(state: &AppState) -> Result<(OidcConfig, Client), ApiError> {
     .set_redirect_uri(
         RedirectUrl::new(provider::redirect_uri(&state.config.public_url))
             .map_err(ApiError::internal)?,
-    );
-    Ok((cfg, client))
+    ))
 }
 
 type Client = CoreClient<
@@ -166,7 +175,7 @@ pub async fn callback(
         return Ok((jar, login_error("oidc_failed")).into_response());
     }
 
-    let (_cfg, client) = client(&state).await?;
+    let (cfg, client) = client(&state).await?;
     let http = http_client()?;
     let token = match client.exchange_code(AuthorizationCode::new(code)) {
         Ok(req) => {
@@ -189,8 +198,27 @@ pub async fn callback(
     let Some(id_token) = token.id_token() else {
         return Ok((jar, login_error("oidc_failed")).into_response());
     };
-    let claims = match id_token.claims(&client.id_token_verifier(), &Nonce::new(flow.nonce)) {
-        Ok(c) => c,
+    let nonce = Nonce::new(flow.nonce);
+    let claims: CoreIdTokenClaims = match id_token.claims(&client.id_token_verifier(), &nonce) {
+        Ok(c) => c.clone(),
+        // The provider may have rotated its signing keys. Fetch them again
+        // once and retry. A failed refresh keeps the known keys and rejects.
+        Err(ClaimsVerificationError::SignatureVerification(
+            SignatureVerificationError::NoMatchingKey,
+        )) => {
+            let retried = match state.oidc_metadata.refresh(&cfg.issuer).await {
+                Ok(meta) => build_client(&state, &cfg, meta)
+                    .map(|c| id_token.claims(&c.id_token_verifier(), &nonce).cloned()),
+                Err(e) => Err(e),
+            };
+            match retried {
+                Ok(Ok(c)) => c,
+                _ => {
+                    tracing::warn!("ID token signed with an unknown key");
+                    return Ok((jar, login_error("oidc_failed")).into_response());
+                }
+            }
+        }
         Err(e) => {
             tracing::warn!(error = %e, "ID token rejected");
             return Ok((jar, login_error("oidc_failed")).into_response());

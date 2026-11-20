@@ -179,18 +179,20 @@ async fn check_code(state: &AppState, auth: &AuthUser, code: &str) -> Result<(),
         .ok_or_else(|| ApiError::BadRequest("start two-factor setup first".into()))?;
     let now = u64::try_from(crate::store::now()).unwrap_or_default();
     let last = u64::try_from(auth.user.totp_last_step).unwrap_or_default();
-    match crypto::totp_match(&secret, code, now, last) {
+    let consumed = match crypto::totp_match(&secret, code, now, last) {
         Some(step) => {
             state
                 .store
-                .set_totp_last_step(auth.user.id, i64::try_from(step).unwrap_or(i64::MAX))
-                .await?;
-            Ok(())
+                .consume_totp_step(auth.user.id, i64::try_from(step).unwrap_or(i64::MAX))
+                .await?
         }
-        None => {
-            state.logins.fail(&[key.as_str()]);
-            Err(ApiError::Validation("the code is not correct".into()))
-        }
+        None => false,
+    };
+    if consumed {
+        Ok(())
+    } else {
+        state.logins.fail(&[key.as_str()]);
+        Err(ApiError::Validation("the code is not correct".into()))
     }
 }
 

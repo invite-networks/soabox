@@ -27,7 +27,7 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
       oidc:
-        image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+        image: ghcr.io/navikt/mock-oauth2-server:latest
         env:
           JSON_CONFIG: '{"interactiveLogin":false}'
         ports: ["28080:8080"]
@@ -110,7 +110,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan history for secrets
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --verbose
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest git /repo --redact --verbose
 
   supply-chain:
     runs-on: ubuntu-latest
@@ -150,5 +150,5 @@ jobs:
       - name: Scan the image for vulnerabilities
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.71.0 image --scanners vuln,secret,misconfig \
+            aquasec/trivy:latest image --scanners vuln,secret,misconfig \
             --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 soabox:ci

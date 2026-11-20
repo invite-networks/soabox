@@ -139,7 +139,7 @@ Changes from the plan made during implementation:
 
 - PowerDNS answers a forbidden or unknown key with `401` and `WWW-Authenticate: X-API-Key realm="PowerDNS"`, a missing zone or server with `404 {"error": "Not Found"}`, and uses `": "` and `", "` separators. SOAbox reproduces all of these byte for byte.
 - PowerDNS sends no `Server` header. SOAbox copies all upstream headers except hop-by-hop ones instead.
-- `OPTIONS` (CORS preflight) is forwarded without a key, as PowerDNS answers it without one.
+- `OPTIONS` (CORS preflight) is forwarded without a key, as PowerDNS answers it without one. Superseded by [ADR-0016](../adr/0016-audit-hardening-2026-11.md): SOAbox now answers `OPTIONS` itself.
 - Zones created by a scoped key are also added to that key's own zone list, so the key can reach them even if its create account is not in its account scope.
 - The development Compose file has a `pdns-init` service that creates the PowerDNS SQLite schema, because a bind mount hides the image's database.
 

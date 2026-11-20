@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All configuration comes from environment variables. In `dev` mode, a `.env` file in the working directory is also loaded. In `prod` mode it is not. Any variable marked secret can be given as a file path instead by adding `_FILE` to its name (for example `SOABOX_PDNS_API_KEY_FILE=/run/secrets/pdns_key`).
+All configuration comes from environment variables. In `dev` mode, a `.env` file in the working directory is also loaded. Production is never configured from a `.env` file: if one was loaded and the resulting mode is `prod`, SOAbox refuses to start. Values passed by Compose `env_file` are ordinary environment variables and are not affected (see [ADR-0016](../adr/0016-audit-hardening-2026-11.md)). Any variable marked secret can be given as a file path instead by adding `_FILE` to its name (for example `SOABOX_PDNS_API_KEY_FILE=/run/secrets/pdns_key`).
 
 | Variable | Required | Default | Secret | Purpose |
 |---|---|---|---|---|
@@ -16,7 +16,7 @@ All configuration comes from environment variables. In `dev` mode, a `.env` file
 | `SOABOX_TRUSTED_PROXIES` | Behind a proxy | empty | | Comma-separated CIDRs allowed to set `X-Forwarded-*`. Without it, every client appears as the proxy and shares one rate limit. |
 | `SOABOX_SECRET_KEY` | Yes | none | Yes | 32 random bytes, base64. Encrypts TOTP secrets and the OIDC client secret stored from the UI, and protects short-lived sign-in cookies. |
 | `SOABOX_SECRET_KEY_PREVIOUS` | No | none | Yes | Previous key, accepted for decryption during rotation. |
-| `SOABOX_OIDC_ISSUER` | No | none | | Optional. Enables OIDC from the environment and overrides the UI settings (see below). For Entra: `https://login.microsoftonline.com/<tenant-id>/v2.0`. |
+| `SOABOX_OIDC_ISSUER` | No | none | | Optional. Enables OIDC from the environment and overrides the UI settings (see below). Must use `https` in `prod` mode. For Entra: `https://login.microsoftonline.com/<tenant-id>/v2.0`. |
 | `SOABOX_OIDC_CLIENT_ID` | With issuer | none | | |
 | `SOABOX_OIDC_CLIENT_SECRET` | With issuer | none | Yes | |
 | `SOABOX_OIDC_BUTTON_LABEL` | No | `Sign in with SSO` | | Text on the sign-in button. |

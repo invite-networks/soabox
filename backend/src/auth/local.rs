@@ -159,14 +159,22 @@ pub async fn login(
             .and_then(|enc| crypto::decrypt(crypto::PURPOSE_TOTP, &state.secret_keys(), enc));
         let now = u64::try_from(crate::store::now()).unwrap_or_default();
         let last = u64::try_from(user.totp_last_step).unwrap_or_default();
-        let Some(step) = secret.and_then(|s| crypto::totp_match(&s, code, now, last)) else {
-            state.logins.fail(&keys);
-            return Err(ApiError::Unauthenticated);
+        // Wrong and replayed codes count against the client and the account,
+        // so guesses spread across many addresses still reach a limit.
+        let consumed = match secret.and_then(|s| crypto::totp_match(&s, code, now, last)) {
+            Some(step) => {
+                state
+                    .store
+                    .consume_totp_step(user.id, i64::try_from(step).unwrap_or(i64::MAX))
+                    .await?
+            }
+            None => false,
         };
-        state
-            .store
-            .set_totp_last_step(user.id, i64::try_from(step).unwrap_or(i64::MAX))
-            .await?;
+        if !consumed {
+            state.logins.fail(&keys);
+            state.login_users.fail(&[user_key.as_str()]);
+            return Err(ApiError::Unauthenticated);
+        }
     }
 
     state.logins.succeed(&[pair_key.as_str()]);
