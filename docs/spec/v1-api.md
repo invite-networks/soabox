@@ -59,7 +59,7 @@ Related: [Design](design.md) | [Requirements](requirements.md)
 
 `ZoneSummary`: `{"id", "name", "kind", "serial", "dnssec", "account": {"id", "name"} or null, "masters": []}`
 
-`Zone`: `ZoneSummary` plus `{"soa_edit_api", "api_rectify", "nsec3param", "rrsets": RrSet[]}`
+`Zone`: `ZoneSummary` plus `{"soa_edit_api", "api_rectify", "nsec3param", "allowed_record_types": [], "rrsets": RrSet[]}`. `allowed_record_types` comes from the forward or reverse list in settings, so every user sees the types the backend will accept.
 
 `RrSet`: `{"name", "type", "ttl", "records": [{"content", "disabled"}], "comments": [{"content", "account", "modified_at"}]}`
 
@@ -94,7 +94,13 @@ Automatic PTR: when the `auto_ptr` setting is on and a `PATCH` replaces an `A` o
 
 ## History
 
-`HistoryEntry`: `{"id", "at", "actor_type", "actor_name", "client_ip", "operation", "zone_name", "outcome", "upstream_status", "diff", "detail"}`
+`HistoryEntry`: `{"id", "at", "actor_type", "actor_name", "client_ip", "operation", "zone_name", "zone_id", "outcome", "upstream_status", "diff", "detail"}`
+
+- `outcome` is `success` or `failure`. `zone_name`, `zone_id`, `upstream_status`, `diff`, and `detail` may be null.
+- `diff` has one of two shapes:
+  - Record changes: `[{"name", "type", "before": {"ttl", "records": [{"content", "disabled"}]} or null, "after": same or null}]`. `before` null means added, `after` null means removed.
+  - Zone setting changes (`zone.update`): `{"zone": [{"field", "before", "after"}]}`.
+- `detail` is the redacted request for operations without a diff, and `{"request", "error"}` for failures.
 
 | Method and path | Response |
 |---|---|

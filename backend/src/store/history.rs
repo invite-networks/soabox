@@ -31,6 +31,8 @@ pub struct HistoryEntry {
     pub client_ip: String,
     pub operation: String,
     pub zone_name: Option<String>,
+    /// The zone's id for `/v1/zones/{id}` links.
+    pub zone_id: Option<String>,
     pub outcome: String,
     pub upstream_status: Option<i64>,
     #[schema(value_type = Option<Object>)]
@@ -142,6 +144,11 @@ impl Store {
                     actor_name: r.try_get(4)?,
                     client_ip: r.try_get(5)?,
                     operation: r.try_get(6)?,
+                    zone_id: r
+                        .try_get::<Option<String>, _>(7)?
+                        .as_deref()
+                        .and_then(crate::pdns::ZoneName::from_name)
+                        .map(|z| z.to_url_id()),
                     zone_name: r.try_get(7)?,
                     outcome: r.try_get(8)?,
                     upstream_status: r.try_get(9)?,

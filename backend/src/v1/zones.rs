@@ -55,6 +55,8 @@ pub struct ZoneDetail {
     pub soa_edit_api: String,
     pub api_rectify: bool,
     pub nsec3param: String,
+    /// Record types the editor may offer in this zone, from settings.
+    pub allowed_record_types: Vec<String>,
     #[schema(value_type = Vec<Object>)]
     pub rrsets: Vec<RrSet>,
 }
@@ -153,6 +155,14 @@ async fn detail(state: &AppState, zone: &ZoneName) -> Result<ZoneDetail, ApiErro
             .and_then(Value::as_bool)
             .unwrap_or(false),
         nsec3param: text("nsec3param"),
+        allowed_record_types: {
+            let settings = Settings::load(&state.store).await?;
+            if is_reverse(zone) {
+                settings.record_types_reverse
+            } else {
+                settings.record_types_forward
+            }
+        },
         rrsets,
     })
 }

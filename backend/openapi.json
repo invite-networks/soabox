@@ -2140,6 +2140,13 @@
               "null"
             ]
           },
+          "zone_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The zone's id for `/v1/zones/{id}` links."
+          },
           "outcome": {
             "type": "string"
           },
@@ -2934,6 +2941,7 @@
               "soa_edit_api",
               "api_rectify",
               "nsec3param",
+              "allowed_record_types",
               "rrsets"
             ],
             "properties": {
@@ -2945,6 +2953,13 @@
               },
               "nsec3param": {
                 "type": "string"
+              },
+              "allowed_record_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Record types the editor may offer in this zone, from settings."
               },
               "rrsets": {
                 "type": "array",
