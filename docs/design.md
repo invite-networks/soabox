@@ -63,6 +63,7 @@ flowchart TD
 
 ### API keys
 
+- Two separate kinds of key, always. Clients use SOAbox keys. SOAbox uses its own pdns key (`SOABOX_PDNS_API_KEY`) for every upstream call. A client's `X-API-Key` is never forwarded to pdns: it is checked by SOAbox and replaced with the pdns key on every request. A client that sends the pdns key itself is rejected like any other unknown key.
 - Issued by SOAbox, stored as an argon2id hash with a short lookup prefix. The full key is shown once at creation.
 - Each key has a role and a scope:
   - **Admin key**: full pdns API, including server-level endpoints (config, statistics, tsigkeys, autoprimaries, cache flush).
