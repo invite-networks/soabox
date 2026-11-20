@@ -80,7 +80,7 @@ Open http://localhost:8080 and sign in as the bootstrap Admin. See [getting star
 | 3 | Web UI: zones and record editor | Done |
 | 4 | Administration: users, accounts, keys, templates, history | Done |
 | 5 | DNSSEC, metadata, TSIG, server views | Done |
-| 6 | Hardening and first release | Hardening done, release pending maintainer review |
+| 6 | Hardening and first release | Done. v0.1.0 released 2026-11-19 |
 
 ## Documentation
 

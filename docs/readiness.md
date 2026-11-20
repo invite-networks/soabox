@@ -14,12 +14,16 @@
 - The design, roles, authentication model, key handling, database choice, license, and repository location were each decided by the maintainer in conversation before this baseline was written.
 - The baseline was written by an agent. It has not had an independent document review. The maintainer will review it on return. Any change from that review follows the normal process: update the documents, then the code.
 
+## Release Decision
+
+The maintainer reviewed the delivered build on 2026-11-19 and approved tagging v0.1.0 from main at a green CI run. The items below were not blockers for a 0.x release and carry forward.
+
 ## Open Later-Phase Items
 
 | Item | Owner | Status |
 |---|---|---|
-| Execute every runbook in a test environment and record results | Maintainer | Executed by the authoring agent on 2026-11-19. Independent execution still required before the first release. |
+| Execute every runbook in a test environment and record results | Maintainer | Executed by the authoring agent on 2026-11-19. Independent execution remains a follow-up for a later 0.x release. |
 | Verify Entra ID setup against a live tenant | Maintainer | Open. OIDC is verified end to end against a mock provider in CI. |
-| Load tests for NFR-PERF-01 and NFR-PERF-02 | Maintainer | Passed on 2026-11-19 on a workstation. Repeat on reference hardware before the first release. |
+| Load tests for NFR-PERF-01 and NFR-PERF-02 | Maintainer | Passed on 2026-11-19 on a workstation. Repeat on reference hardware in a later 0.x release. |
 | Security and dependency audit | Maintainer | Completed 2026-11-19. All Critical and High findings fixed with regression tests. Accepted items carry written reasons and a review date of 2027-02-19. |
 | Independent review of the documentation baseline | Maintainer | Open. |
