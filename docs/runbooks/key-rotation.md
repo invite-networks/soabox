@@ -1,13 +1,15 @@
 # Key And Secret Rotation
 
-- Validation status: **Planned, not yet executed.**
+- Validation status: **Executed 2026-11-19** on Docker Desktop (macOS) by the authoring agent, against the development stack and the production Compose example with Postgres. Independent execution by someone other than the author is still required before the first release.
 
 ## PowerDNS API Key
 
 Clients are not affected because they hold SOAbox keys.
 
 1. Add the new key to PowerDNS (`api-key` accepts one value, so plan a short window) and restart PowerDNS.
-2. Update `SOABOX_PDNS_API_KEY` and restart SOAbox.
+2. Update `SOABOX_PDNS_API_KEY` and restart SOAbox with `docker compose up -d`.
+
+Compose gives variables already exported in your shell priority over `.env`. If you have sourced `.env` into your shell, unset the old values first or the containers keep the old key.
 3. Confirm `/readyz`.
 
 ## Revoking An API Key

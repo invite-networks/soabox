@@ -2,7 +2,7 @@
 
 - Trigger: a new release.
 - Prerequisites: the release notes read, a fresh backup taken.
-- Validation status: **Planned, not yet executed.**
+- Validation status: **Executed 2026-11-19** on Docker Desktop (macOS) by the authoring agent, against the development stack and the production Compose example with Postgres. Independent execution by someone other than the author is still required before the first release.
 
 ## Upgrade
 

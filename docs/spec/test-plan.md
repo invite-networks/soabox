@@ -69,3 +69,14 @@ A release requires all of the following on the tagged revision:
 5. `cargo audit`, `cargo deny check`, `pnpm audit --prod` with no unresolved Critical or High.
 6. Container builds, starts, passes `/readyz`, survives a restart with data intact.
 7. Security and dependency audit reports reviewed and findings resolved or accepted with a recorded reason.
+
+## 4. Performance Results
+
+Executed 2026-11-19 with `scripts/loadtest.py` on a 10-core macOS host with Docker Desktop and PowerDNS 5.1.5 (SQLite backend).
+
+| Requirement | Measurement | Result |
+|---|---|---|
+| NFR-PERF-01 | `GET /servers/localhost` at 50 requests per second for 20 s, direct p95 7.78 ms, through SOAbox p95 6.44 ms | Pass: no added latency (SOAbox reuses connections to PowerDNS) |
+| NFR-PERF-02 | `GET /zones` with 10,000 zones and a scoped key, direct p95 101.20 ms, through SOAbox p95 102.76 ms | Pass: 1.56 ms added |
+
+The host is faster than the 2 vCPU reference in the requirement. Repeat on reference hardware before the first release.

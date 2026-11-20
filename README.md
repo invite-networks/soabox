@@ -60,16 +60,27 @@ flowchart TD
 
 Built with Rust (Axum) on the backend and React on the frontend. Details are in the [design document](docs/spec/design.md).
 
+## Quick Start
+
+```sh
+git clone https://github.com/invite-networks/soabox.git
+cd soabox
+cp .env.example .env    # set the keys and the bootstrap Admin password
+docker compose up --build
+```
+
+Open http://localhost:8080 and sign in as the bootstrap Admin. See [getting started](docs/dev/getting-started.md) and the [install runbook](docs/runbooks/install.md).
+
 ## Roadmap
 
 | Milestone | Scope | Status |
 |---|---|---|
-| 1 | [PowerDNS-compatible API with scoped keys and audit](docs/plans/milestone-1-passthrough.md) | Planned |
-| 2 | Users, sessions, local and OIDC sign-in | Planned |
-| 3 | Web UI: zones and record editor | Planned |
-| 4 | Administration: users, accounts, keys, templates, history | Planned |
-| 5 | DNSSEC, metadata, TSIG, server views | Planned |
-| 6 | Hardening and first release | Planned |
+| 1 | [PowerDNS-compatible API with scoped keys and audit](docs/plans/milestone-1-passthrough.md) | Done |
+| 2 | [Users, sessions, local and OIDC sign-in](docs/plans/milestones-2-5-backend.md) | Done |
+| 3 | Web UI: zones and record editor | Done |
+| 4 | Administration: users, accounts, keys, templates, history | Done |
+| 5 | DNSSEC, metadata, TSIG, server views | Done |
+| 6 | Hardening and first release | In progress |
 
 ## Documentation
 

@@ -33,7 +33,10 @@ services:
     restart: unless-stopped
 
   soabox:
-    build: .
+    build:
+      context: .
+      args:
+        SOABOX_GIT_SHA: ${SOABOX_GIT_SHA:-dev}
     env_file: .env
     environment:
       SOABOX_PDNS_URL: http://pdns:8081

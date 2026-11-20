@@ -1,0 +1,50 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+@plugin "tailwindcss-react-aria-components";
+
+/* Map the theme tokens from theme.css onto Tailwind utilities. */
+@theme inline {
+  --font-sans: var(--sb-font-sans);
+  --font-mono: var(--sb-font-mono);
+
+  --color-bg: var(--sb-bg);
+  --color-surface: var(--sb-surface);
+  --color-surface-muted: var(--sb-surface-muted);
+  --color-surface-hover: var(--sb-surface-hover);
+  --color-border: var(--sb-border);
+  --color-border-strong: var(--sb-border-strong);
+  --color-fg: var(--sb-fg);
+  --color-fg-muted: var(--sb-fg-muted);
+  --color-accent: var(--sb-accent);
+  --color-accent-hover: var(--sb-accent-hover);
+  --color-accent-fg: var(--sb-accent-fg);
+  --color-accent-soft: var(--sb-accent-soft);
+  --color-accent-text: var(--sb-accent-text);
+  --color-focus: var(--sb-focus);
+  --color-success: var(--sb-success);
+  --color-success-soft: var(--sb-success-soft);
+  --color-warning: var(--sb-warning);
+  --color-warning-soft: var(--sb-warning-soft);
+  --color-danger: var(--sb-danger);
+  --color-danger-hover: var(--sb-danger-hover);
+  --color-danger-fg: var(--sb-danger-fg);
+  --color-danger-soft: var(--sb-danger-soft);
+  --color-overlay: var(--sb-overlay);
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
