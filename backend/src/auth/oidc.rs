@@ -36,14 +36,20 @@ struct FlowState {
 
 fn encode_flow(key: &[u8; 32], f: &FlowState) -> anyhow::Result<String> {
     let json = serde_json::to_vec(f)?;
-    Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(crypto::encrypt(key, &json)?))
+    Ok(
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(crypto::encrypt(
+            crypto::PURPOSE_OIDC_FLOW,
+            key,
+            &json,
+        )?),
+    )
 }
 
 fn decode_flow(keys: &[&[u8; 32]], raw: &str) -> Option<FlowState> {
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(raw)
         .ok()?;
-    let json = crypto::decrypt(keys, &bytes)?;
+    let json = crypto::decrypt(crypto::PURPOSE_OIDC_FLOW, keys, &bytes)?;
     serde_json::from_slice(&json).ok()
 }
 

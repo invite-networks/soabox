@@ -207,6 +207,9 @@ pub async fn update_user(
     if user.role != req.role || req.status != UserStatus::Active {
         state.store.delete_user_sessions(id).await?;
     }
+    if req.status != UserStatus::Active {
+        state.store.disable_user_api_keys(id).await?;
+    }
     let p = auth.principal(&state).await?;
     record(&state, &auth, &p, "user.update", None, Ok(()), None, Some(json!({
         "username": user.username, "role": req.role, "status": req.status, "zones": zones, "account_ids": req.account_ids,
@@ -643,6 +646,7 @@ async fn require_tsig(state: &AppState, auth: &AuthUser) -> Result<(), ApiError>
 fn tsig_id(id: &str) -> Result<String, ApiError> {
     if !id.is_empty()
         && id.len() <= 255
+        && !id.bytes().all(|b| b == b'.')
         && id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._-=".contains(&b))

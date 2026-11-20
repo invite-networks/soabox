@@ -25,6 +25,17 @@ pub enum PdnsClientError {
     Decode(#[source] serde_json::Error),
 }
 
+/// Why a forwarded request could not be completed.
+#[derive(Debug, thiserror::Error)]
+pub enum ForwardError {
+    /// The path would be rewritten by URL normalization.
+    #[error("unsafe path")]
+    UnsafePath,
+    /// PowerDNS could not be reached or did not answer in time.
+    #[error(transparent)]
+    Transport(#[from] reqwest::Error),
+}
+
 /// A raw upstream response, forwarded to the client as is.
 #[derive(Debug, Clone)]
 pub struct UpstreamResponse {
@@ -104,16 +115,24 @@ impl PdnsClient {
         &self.server_id
     }
 
-    fn url(&self, path_and_query: &str) -> Url {
+    /// Builds the upstream URL. Returns `None` when URL normalization would
+    /// change the path (dot segments, backslashes, encoded dots), so a request
+    /// can never reach a different PowerDNS resource than the one authorized.
+    fn url(&self, path_and_query: &str) -> Option<Url> {
         let mut u = self.base.clone();
         let (path, query) = match path_and_query.split_once('?') {
             Some((p, q)) => (p, Some(q)),
             None => (path_and_query, None),
         };
         let base_path = u.path().trim_end_matches('/').to_owned();
-        u.set_path(&format!("{base_path}{path}"));
+        let wanted = format!("{base_path}{path}");
+        u.set_path(&wanted);
+        if u.path() != wanted {
+            tracing::warn!(path = %path, "refusing a PowerDNS path that normalizes differently");
+            return None;
+        }
         u.set_query(query);
-        u
+        Some(u)
     }
 
     /// Forwards a request unchanged except for the key and hop-by-hop headers.
@@ -124,7 +143,8 @@ impl PdnsClient {
         path_and_query: &str,
         headers: &HeaderMap,
         body: Bytes,
-    ) -> Result<UpstreamResponse, reqwest::Error> {
+    ) -> Result<UpstreamResponse, ForwardError> {
+        let url = self.url(path_and_query).ok_or(ForwardError::UnsafePath)?;
         let mut out = HeaderMap::new();
         for (name, value) in headers {
             if !is_dropped_request_header(name) {
@@ -133,7 +153,7 @@ impl PdnsClient {
         }
         let resp = self
             .http
-            .request(method, self.url(path_and_query))
+            .request(method, url)
             .headers(out)
             .header("X-API-Key", self.key.expose())
             .body(body)
@@ -158,9 +178,15 @@ impl PdnsClient {
         path_and_query: &str,
         body: Option<&serde_json::Value>,
     ) -> Result<Bytes, PdnsClientError> {
+        let Some(url) = self.url(path_and_query) else {
+            return Err(PdnsClientError::Status {
+                status: 404,
+                message: "Not Found".into(),
+            });
+        };
         let mut req = self
             .http
-            .request(method, self.url(path_and_query))
+            .request(method, url)
             .header("X-API-Key", self.key.expose());
         if let Some(b) = body {
             req = req.json(b);
@@ -340,8 +366,16 @@ mod tests {
         )
         .expect("client");
         assert_eq!(
-            c.url("/api/v1/servers?a=b").as_str(),
+            c.url("/api/v1/servers?a=b").expect("url").as_str(),
             "http://pdns:8081/prefix/api/v1/servers?a=b"
         );
+        for bad in [
+            "/api/v1/servers/localhost/zones/a.test./../../tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test./%2e%2e/%2E%2E/tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test.\\..\\..\\tsigkeys",
+            "/api/v1/servers/localhost/zones/.",
+        ] {
+            assert!(c.url(bad).is_none(), "{bad}");
+        }
     }
 }

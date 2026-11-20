@@ -4,7 +4,9 @@ name: soabox
 
 services:
   pdns-init:
-    image: powerdns/pdns-auth-51:5.1.5
+    image: powerdns/pdns-auth-51:5.1.5@sha256:77ff4efdbb9ec30e9309c8a1cbed6121a67fa3be25c848bbbfa756fc75bf9a27
+    # Runs once as root only to create the PowerDNS database and hand the
+    # directory to the pdns user (UID 953) inside the image.
     user: "0"
     entrypoint:
       - sh
@@ -18,7 +20,7 @@ services:
     restart: "no"
 
   pdns:
-    image: powerdns/pdns-auth-51:5.1.5
+    image: powerdns/pdns-auth-51:5.1.5@sha256:77ff4efdbb9ec30e9309c8a1cbed6121a67fa3be25c848bbbfa756fc75bf9a27
     environment:
       PDNS_AUTH_API_KEY: ${PDNS_AUTH_API_KEY:?set PDNS_AUTH_API_KEY in .env}
     volumes:

@@ -99,10 +99,12 @@ pub async fn login(
     jar: CookieJar,
     Json(req): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let name = req.username.to_ascii_lowercase();
     let ip_key = format!("ip:{}", client.ip);
-    let user_key = format!("user:{}", req.username.to_ascii_lowercase());
-    let keys = [ip_key.as_str(), user_key.as_str()];
-    if state.logins.blocked(&keys) {
+    let pair_key = format!("pair:{}:{name}", client.ip);
+    let user_key = format!("user:{name}");
+    let keys = [ip_key.as_str(), pair_key.as_str()];
+    if state.logins.blocked(&keys) || state.login_users.blocked(&[user_key.as_str()]) {
         return Err(ApiError::RateLimited);
     }
 
@@ -115,6 +117,7 @@ pub async fn login(
                 .is_some_and(|h| crypto::verify_password(&req.password, h));
             if !ok {
                 state.logins.fail(&keys);
+                state.login_users.fail(&[user_key.as_str()]);
                 return Err(ApiError::Unauthenticated);
             }
             u
@@ -153,15 +156,20 @@ pub async fn login(
         let secret = user
             .totp_secret_enc
             .as_deref()
-            .and_then(|enc| crypto::decrypt(&state.secret_keys(), enc));
+            .and_then(|enc| crypto::decrypt(crypto::PURPOSE_TOTP, &state.secret_keys(), enc));
         let now = u64::try_from(crate::store::now()).unwrap_or_default();
-        if !secret.is_some_and(|s| crypto::totp_check(&s, code, now)) {
+        let last = u64::try_from(user.totp_last_step).unwrap_or_default();
+        let Some(step) = secret.and_then(|s| crypto::totp_match(&s, code, now, last)) else {
             state.logins.fail(&keys);
             return Err(ApiError::Unauthenticated);
-        }
+        };
+        state
+            .store
+            .set_totp_last_step(user.id, i64::try_from(step).unwrap_or(i64::MAX))
+            .await?;
     }
 
-    state.logins.succeed(&[user_key.as_str()]);
+    state.logins.succeed(&[pair_key.as_str()]);
     super::end_session(&state, &jar).await?;
     let ua = headers
         .get(header::USER_AGENT)

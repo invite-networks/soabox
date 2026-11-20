@@ -123,7 +123,14 @@ impl KeyService {
             return Ok(Err(KeyRejection::Unknown));
         };
         let at = now();
-        let rejection = if key.disabled {
+        let owner_inactive = match key.owner_user_id {
+            Some(uid) => !store
+                .get_user(uid)
+                .await?
+                .is_some_and(|u| u.status == crate::store::UserStatus::Active),
+            None => false,
+        };
+        let rejection = if key.disabled || owner_inactive {
             Some(KeyRejection::Disabled)
         } else if key.is_expired(at) {
             Some(KeyRejection::Expired)

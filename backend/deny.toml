@@ -5,10 +5,11 @@ all-features = false
 version = 2
 yanked = "deny"
 # Fail on unmaintained crates we depend on directly. Transitive ones (for
-# example chrono through openidconnect) are reported by cargo audit.
+# example chrono through openidconnect, RUSTSEC-2026-0543) are reported by
+# cargo audit. chrono comes only from openidconnect; review by 2027-02-19.
 unmaintained = "workspace"
 ignore = [
-    { id = "RUSTSEC-2023-0071", reason = "rsa is used only for public-key signature verification of OIDC ID tokens; the Marvin attack targets private-key operations" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa is used only for public-key signature verification of OIDC ID tokens; the Marvin attack targets private-key operations; review by 2027-02-19" },
 ]
 
 [licenses]

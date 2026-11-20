@@ -26,6 +26,9 @@ pub enum PdnsError {
     BadGateway,
     /// SOAbox could not complete the request because of its own fault.
     Internal,
+    /// A request SOAbox refuses on policy, such as a record type that is not
+    /// allowed, answered like a PowerDNS validation error.
+    Rejected(String),
 }
 
 impl PdnsError {
@@ -37,11 +40,13 @@ impl PdnsError {
             Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             Self::BadGateway => StatusCode::BAD_GATEWAY,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Rejected(_) => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 
-    fn message(&self) -> &'static str {
+    fn message(&self) -> &str {
         match self {
+            Self::Rejected(m) => m,
             Self::Unauthorized => "Unauthorized",
             Self::NotFound => "Not Found",
             Self::BadRequest => "Bad Request",
@@ -55,13 +60,14 @@ impl PdnsError {
 impl IntoResponse for PdnsError {
     fn into_response(self) -> Response {
         let body = to_pdns_string(&serde_json::json!({ "error": self.message() }));
+        let unauthorized = self == Self::Unauthorized;
         let mut resp = (self.status(), body).into_response();
         let headers = resp.headers_mut();
         headers.insert(
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/json"),
         );
-        if self == Self::Unauthorized {
+        if unauthorized {
             headers.insert(
                 header::WWW_AUTHENTICATE,
                 HeaderValue::from_static("X-API-Key realm=\"PowerDNS\""),
@@ -160,13 +166,15 @@ impl From<crate::pdns::PdnsClientError> for ApiError {
     fn from(e: crate::pdns::PdnsClientError) -> Self {
         match e {
             crate::pdns::PdnsClientError::Unavailable(_) => Self::UpstreamUnavailable,
-            crate::pdns::PdnsClientError::Status { status, message } => {
-                if status == 404 {
-                    Self::NotFound("zone".to_owned())
-                } else {
-                    Self::Upstream(message)
+            crate::pdns::PdnsClientError::Status { status, message } => match status {
+                404 => Self::NotFound("zone".to_owned()),
+                // Validation messages explain what to fix and are safe to show.
+                400 | 409 | 422 => Self::Upstream(message.chars().take(300).collect()),
+                _ => {
+                    tracing::warn!(status, error = %message, "PowerDNS request failed");
+                    Self::Upstream("PowerDNS could not complete the request".to_owned())
                 }
-            }
+            },
             crate::pdns::PdnsClientError::Decode(_) => Self::internal(e),
         }
     }

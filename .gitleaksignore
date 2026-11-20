@@ -1,0 +1,6 @@
+# Synthetic TSIG key in a frontend test fixture (base64 of the text secret-key).
+# Not a real credential. The fixture now builds the value at run time.
+26468c56eb2cac7f299c092383c93ced8fbf2f73:frontend/src/test/handlers.ts:generic-api-key:59
+a14f21efbedaf57efa2bbd6c90577f5bc2a21d65:frontend/src/test/handlers.ts:generic-api-key:59
+# Synthetic test password in a frontend component test, since replaced.
+d790bf0a467d5e13fcde06e1d51153765ada394b:frontend/src/__tests__/server-profile.test.tsx:generic-api-key:118

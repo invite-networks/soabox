@@ -21,6 +21,9 @@ impl ZoneName {
         if trimmed.is_empty() && !name.trim().starts_with('.') {
             return None;
         }
+        if trimmed.split('.').any(str::is_empty) && !trimmed.is_empty() {
+            return None;
+        }
         let lowered = trimmed.to_ascii_lowercase();
         Some(Self(format!("{lowered}.")))
     }
@@ -49,6 +52,9 @@ impl ZoneName {
 
     /// The id PowerDNS uses in URLs for this zone, with `/` escaped as `=2F`.
     pub fn to_url_id(&self) -> String {
+        if self.0 == "." {
+            return "=2E".to_owned();
+        }
         let mut out = String::with_capacity(self.0.len());
         for c in self.0.chars() {
             match c {
@@ -130,7 +136,16 @@ mod tests {
 
     #[test]
     fn root_zone() {
-        assert_eq!(ZoneName::from_name(".").expect("root").as_str(), ".");
+        let root = ZoneName::from_name(".").expect("root");
+        assert_eq!(root.as_str(), ".");
+        assert_eq!(root.to_url_id(), "=2E");
+        assert_eq!(ZoneName::from_url_id("=2E").expect("root").0, root);
+    }
+
+    #[test]
+    fn empty_labels_are_rejected() {
+        assert!(ZoneName::from_name("a..b.").is_none());
+        assert!(ZoneName::from_name(".a.").is_none());
     }
 
     #[test]

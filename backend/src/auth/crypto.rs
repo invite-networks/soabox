@@ -51,30 +51,53 @@ pub fn token_digest(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 
-/// Encrypts with XChaCha20-Poly1305. Output is nonce followed by ciphertext.
-pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> anyhow::Result<Vec<u8>> {
+/// Associated data for encrypted TOTP secrets.
+pub const PURPOSE_TOTP: &[u8] = b"soabox/totp/v1";
+/// Associated data for the encrypted OIDC flow cookie.
+pub const PURPOSE_OIDC_FLOW: &[u8] = b"soabox/oidc-flow/v1";
+
+/// Encrypts with XChaCha20-Poly1305, bound to `purpose` as associated data
+/// so a ciphertext made for one use cannot be accepted for another. Output
+/// is nonce followed by ciphertext.
+pub fn encrypt(purpose: &[u8], key: &[u8; 32], plaintext: &[u8]) -> anyhow::Result<Vec<u8>> {
     let cipher = XChaCha20Poly1305::new(key.into());
     let nonce_bytes = random_bytes::<24>()?;
     let nonce = XNonce::from(nonce_bytes);
     let mut out = nonce_bytes.to_vec();
     out.extend(
         cipher
-            .encrypt(&nonce, plaintext)
+            .encrypt(
+                &nonce,
+                chacha20poly1305::aead::Payload {
+                    msg: plaintext,
+                    aad: purpose,
+                },
+            )
             .map_err(|_| anyhow::anyhow!("encryption failed"))?,
     );
     Ok(out)
 }
 
-/// Decrypts data from [`encrypt`], trying each key in order.
-pub fn decrypt(keys: &[&[u8; 32]], data: &[u8]) -> Option<Vec<u8>> {
+/// Decrypts data from [`encrypt`] for the same `purpose`, trying each key
+/// in order.
+pub fn decrypt(purpose: &[u8], keys: &[&[u8; 32]], data: &[u8]) -> Option<Vec<u8>> {
     if data.len() < 24 {
         return None;
     }
     let (nonce_bytes, ct) = data.split_at(24);
     let nonce_arr: [u8; 24] = nonce_bytes.try_into().ok()?;
     let nonce = XNonce::from(nonce_arr);
-    keys.iter()
-        .find_map(|k| XChaCha20Poly1305::new((*k).into()).decrypt(&nonce, ct).ok())
+    keys.iter().find_map(|k| {
+        XChaCha20Poly1305::new((*k).into())
+            .decrypt(
+                &nonce,
+                chacha20poly1305::aead::Payload {
+                    msg: ct,
+                    aad: purpose,
+                },
+            )
+            .ok()
+    })
 }
 
 const BASE32: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -115,14 +138,21 @@ pub fn totp_at(secret: &[u8], step: u64) -> String {
 
 /// Checks a TOTP code at `now`, allowing one step of clock drift.
 pub fn totp_check(secret: &[u8], code: &str, now: u64) -> bool {
+    totp_match(secret, code, now, 0).is_some()
+}
+
+/// Returns the time step a code matches, allowing one step of drift, but
+/// only if it is later than `last_step`. This stops a code being replayed.
+pub fn totp_match(secret: &[u8], code: &str, now: u64, last_step: u64) -> Option<u64> {
     let code = code.trim();
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
-        return false;
+        return None;
     }
     let step = now / 30;
     [step.saturating_sub(1), step, step + 1]
-        .iter()
-        .any(|s| constant_eq(totp_at(secret, *s).as_bytes(), code.as_bytes()))
+        .into_iter()
+        .filter(|s| *s > last_step)
+        .find(|s| constant_eq(totp_at(secret, *s).as_bytes(), code.as_bytes()))
 }
 
 /// The `otpauth://` URL authenticator apps read.
@@ -182,6 +212,15 @@ mod tests {
     }
 
     #[test]
+    fn totp_codes_cannot_be_replayed() {
+        let secret = b"12345678901234567890";
+        let now = 1_234_567_890;
+        let code = totp_at(secret, now / 30);
+        let step = totp_match(secret, &code, now, 0).expect("first use");
+        assert!(totp_match(secret, &code, now, step).is_none());
+    }
+
+    #[test]
     fn base32() {
         assert_eq!(base32_encode(b"foobar"), "MZXW6YTBOI");
         assert_eq!(base32_encode(b"f"), "MY");
@@ -192,11 +231,18 @@ mod tests {
     fn encrypt_round_trip_and_rotation() {
         let k1 = [1u8; 32];
         let k2 = [2u8; 32];
-        let ct = encrypt(&k1, b"secret").expect("enc");
+        let ct = encrypt(PURPOSE_TOTP, &k1, b"secret").expect("enc");
         assert_ne!(&ct[24..], b"secret");
-        assert_eq!(decrypt(&[&k2, &k1], &ct).expect("dec"), b"secret");
-        assert!(decrypt(&[&k2], &ct).is_none());
-        assert!(decrypt(&[&k1], b"short").is_none());
+        assert_eq!(
+            decrypt(PURPOSE_TOTP, &[&k2, &k1], &ct).expect("dec"),
+            b"secret"
+        );
+        assert!(decrypt(PURPOSE_TOTP, &[&k2], &ct).is_none());
+        assert!(
+            decrypt(PURPOSE_OIDC_FLOW, &[&k1], &ct).is_none(),
+            "purpose is bound"
+        );
+        assert!(decrypt(PURPOSE_TOTP, &[&k1], b"short").is_none());
     }
 
     #[test]

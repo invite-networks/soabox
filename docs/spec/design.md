@@ -68,6 +68,16 @@ Design goals:
 
 The same core serves UI requests, with User role permissions taken from settings (FR-RBAC-03).
 
+Additional rules applied to writes on both `/api` and `/v1`, added after the pre-release security audit:
+
+- Paths are split into segments before authorization. Empty, `.`, and `..` segments (plain or percent-encoded), backslashes, and encoded slashes are refused with the PowerDNS `404`, and only the checked segments are forwarded. The PowerDNS client also refuses any path that URL normalization would change.
+- A key never exceeds its owner. Its level is capped at the owner's current role, a key owned by a User only reaches the owner's current zones and follows the User settings (delete zones, DNSSEC, allowed record types, zone creation), and keys of a disabled owner stop working.
+- Metadata kinds that run code, make PowerDNS contact other hosts, or forward updates (for example `LUA-AXFR-SCRIPT`, `AXFR-SOURCE`, `ALSO-NOTIFY`, `FORWARD-DNSUPDATE`) are Admin only. Other roles may set the kinds in the allowlist in `authz.rs`.
+- Secondary zones and primaries can be set only by Admins and Operators, because primaries make PowerDNS connect to other hosts.
+- `LUA` records are Admin only unless the record type lists in settings allow them.
+- A limited principal cannot create a zone equal to, above, or below a zone outside its scope.
+- Refused writes are recorded in history with outcome `failure`.
+
 ### 3.4 Key handling
 
 SOAbox always replaces the client's key ([ADR-0004](../adr/0004-api-key-swap.md)). See the [passthrough write sequence](../uml/sequence-passthrough-write.md).
@@ -113,11 +123,12 @@ Zone names are stored in PowerDNS canonical form with a trailing dot. SOAbox nev
 
 ## 5. Authentication Design
 
-- Local: argon2id password hashes, optional TOTP with secrets encrypted by an AEAD key derived from `SOABOX_SECRET_KEY`.
+- Local: argon2id password hashes, optional TOTP with secrets encrypted with XChaCha20-Poly1305 under `SOABOX_SECRET_KEY`, bound to their purpose as associated data. A TOTP code is accepted at most once (the last accepted time step is stored). Turning TOTP off needs the password and a code. Changing the password ends the user's other sessions. Password and code checks after sign-in are rate limited per account.
 - OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. For Entra, the issuer is the tenant-specific v2.0 endpoint. Users are matched on the `iss` and `sub` claims, which Entra keeps stable for a user within one app registration. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
 - Sessions: a random 32-byte id in the cookie, SHA-256 hashed in the database. `HttpOnly`, `Secure`, `SameSite=Lax`. Rotated on sign-in and role change. Idle and absolute timeouts from configuration.
 - CSRF: per-session token sent in a header on state-changing `/v1` calls.
-- Rate limits: sign-in and failed key attempts per client IP and per account, in memory, returning `429`.
+- Rate limits: failed key attempts per client IP; sign-in failures per client IP, per client IP and username pair, and a higher limit per username across all addresses, so one attacker cannot quickly lock an account out. In memory per process, returning `429`. Behind a proxy, `SOABOX_TRUSTED_PROXIES` must be set or all clients share one limit; SOAbox warns at startup in `prod` when it is empty.
+- In `prod`, `SOABOX_PUBLIC_URL` must be `https`, the secret key must look random, and `.env` files are not loaded.
 
 ## 6. Audit Design
 
@@ -149,7 +160,7 @@ All variables use the `SOABOX_` prefix ([ADR-0011](../adr/0011-configuration-and
 
 See the [deployment diagram](../uml/deployment.md).
 
-- One container image built from a multi-stage Dockerfile. Distroless runtime, `USER 1001:1001`, version string from the crate version and short git SHA.
+- One container image built from a multi-stage Dockerfile with base images pinned by digest. The binary is statically linked against musl and runs on distroless `static`, which has no C library or OpenSSL, as `USER 1001:1001`. The version string comes from the crate version and short git SHA. CI scans the image with Trivy and fails on fixable High or Critical findings.
 - The image contains the binary and the built UI.
 - Persistent state in `data/` (SQLite database) or in Postgres.
 - `compose.yaml` at the repository root for development starts SOAbox and PowerDNS 5 with bind mounts under `data/`.

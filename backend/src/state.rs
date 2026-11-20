@@ -17,8 +17,12 @@ pub struct AppState {
     pub store: Store,
     pub pdns: PdnsClient,
     pub keys: Arc<KeyService>,
-    /// Failed sign-in attempts per client address and per username.
+    /// Failed sign-in attempts per client address and per address and
+    /// username pair. Also limits password and code checks after sign-in.
     pub logins: Arc<FailureLimiter>,
+    /// A higher limit per username across all addresses, so one attacker
+    /// cannot lock an account out quickly but a distributed guess is slowed.
+    pub login_users: Arc<FailureLimiter>,
     /// OIDC provider metadata, discovered on first use.
     pub oidc_metadata: Arc<tokio::sync::OnceCell<openidconnect::core::CoreProviderMetadata>>,
 }
@@ -44,6 +48,7 @@ impl AppState {
             pdns,
             keys: Arc::new(KeyService::default()),
             logins: Arc::new(FailureLimiter::new(10, Duration::from_secs(300))),
+            login_users: Arc::new(FailureLimiter::new(100, Duration::from_secs(300))),
             oidc_metadata: Arc::new(tokio::sync::OnceCell::new()),
         })
     }

@@ -34,15 +34,19 @@ pub async fn passthrough(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let path_and_query = uri
-        .path_and_query()
-        .map_or_else(|| uri.path().to_owned(), |p| p.as_str().to_owned());
-    let path = uri.path();
-    let segments: Vec<&str> = path
-        .trim_start_matches("/api")
-        .split('/')
-        .filter(|s| !s.is_empty())
-        .collect();
+    let Some(segments) = safe_segments(uri.path()) else {
+        tracing::info!(client_ip = %client.ip, "rejected an unsafe /api path");
+        return PdnsError::NotFound.into_response();
+    };
+    let mut path_and_query = String::from("/api");
+    for s in &segments {
+        path_and_query.push('/');
+        path_and_query.push_str(s);
+    }
+    if let Some(q) = uri.query() {
+        path_and_query.push('?');
+        path_and_query.push_str(q);
+    }
 
     if method == Method::OPTIONS {
         return forward_plain(&state, method, &path_and_query, &headers, body).await;
@@ -65,7 +69,14 @@ pub async fn passthrough(
             return PdnsError::Internal.into_response();
         }
     };
-    let principal = match Principal::for_api_key(&state.store, &key).await {
+    let settings = match crate::settings::Settings::load(&state.store).await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(error = ?e, "settings lookup failed");
+            return PdnsError::Internal.into_response();
+        }
+    };
+    let principal = match Principal::for_api_key(&state.store, &key, &settings).await {
         Ok(p) => p,
         Err(e) => {
             tracing::error!(error = ?e, "scope lookup failed");
@@ -100,6 +111,34 @@ pub async fn passthrough(
     }
 }
 
+/// Splits the path below `/api` into segments, refusing anything that URL
+/// normalization or PowerDNS could reinterpret: empty segments, `.` and `..`
+/// (plain or percent-encoded), backslashes, encoded slashes, and control
+/// characters. Authorization runs on exactly the segments that are forwarded.
+pub fn safe_segments(path: &str) -> Option<Vec<&str>> {
+    let rest = path.strip_prefix("/api")?;
+    if rest.is_empty() {
+        return Some(Vec::new());
+    }
+    let rest = rest.strip_prefix('/')?;
+    let mut out = Vec::new();
+    for seg in rest.split('/') {
+        let decoded = percent_encoding::percent_decode_str(seg)
+            .decode_utf8()
+            .ok()?;
+        if seg.is_empty()
+            || decoded == "."
+            || decoded == ".."
+            || decoded.contains(['/', '\\'])
+            || decoded.chars().any(char::is_control)
+        {
+            return None;
+        }
+        out.push(seg);
+    }
+    Some(out)
+}
+
 fn is_write(m: &Method) -> bool {
     !matches!(*m, Method::GET | Method::HEAD | Method::OPTIONS)
 }
@@ -122,9 +161,12 @@ async fn forward(
         .pdns
         .forward(method, path_and_query, headers, body)
         .await
-        .map_err(|e| {
-            tracing::warn!(error = %e, "PowerDNS request failed");
-            PdnsError::BadGateway
+        .map_err(|e| match e {
+            crate::pdns::ForwardError::UnsafePath => PdnsError::NotFound,
+            crate::pdns::ForwardError::Transport(e) => {
+                tracing::warn!(error = %e, "PowerDNS request failed");
+                PdnsError::BadGateway
+            }
         })
 }
 
@@ -213,7 +255,89 @@ impl WriteCtx<'_> {
     }
 }
 
+/// Applies the write policy that depends on the request body. Runs before
+/// anything is forwarded.
+async fn policy_check(ctx: &WriteCtx<'_>, body: &Bytes) -> Result<(), PdnsError> {
+    let p = ctx.principal;
+    let json: Option<Value> = serde_json::from_slice(body).ok();
+    let field = |k: &str| json.as_ref().and_then(|v| v.get(k));
+    let check_types = |zone: &ZoneName, sets: Option<&Value>| -> Result<(), PdnsError> {
+        for s in sets.and_then(Value::as_array).into_iter().flatten() {
+            if let Some(t) = s.get("type").and_then(Value::as_str) {
+                p.check_record_type(zone, t).map_err(PdnsError::Rejected)?;
+            }
+        }
+        Ok(())
+    };
+    match ctx.class {
+        RouteClass::ZoneCreate => {
+            if json.as_ref().is_some_and(authz::is_secondary_request) && !p.manage_secondaries {
+                return Err(PdnsError::Unauthorized);
+            }
+            let Some(zone) = field("name")
+                .and_then(Value::as_str)
+                .and_then(ZoneName::from_name)
+            else {
+                return Ok(());
+            };
+            check_types(&zone, field("rrsets"))?;
+            if !p.all_zones() {
+                let existing: Vec<ZoneName> = ctx
+                    .state
+                    .pdns
+                    .list_zones()
+                    .await
+                    .map_err(|_| PdnsError::BadGateway)?
+                    .iter()
+                    .filter_map(|z| ZoneName::from_url_id(&z.id).map(|(n, _)| n))
+                    .collect();
+                p.check_new_zone(&zone, &existing)
+                    .map_err(PdnsError::Rejected)?;
+            }
+            Ok(())
+        }
+        RouteClass::Zone { zone, rest, .. } => match rest.first().map(String::as_str) {
+            None if ctx.method == Method::PATCH => check_types(zone, field("rrsets")),
+            None if ctx.method == Method::PUT => {
+                let dnssec = ["dnssec", "nsec3param", "nsec3narrow"]
+                    .iter()
+                    .any(|k| field(k).is_some());
+                if (dnssec && !p.manage_dnssec)
+                    || (json.as_ref().is_some_and(authz::is_secondary_request)
+                        && !p.manage_secondaries)
+                    || (field("account").is_some() && !p.all_zones())
+                {
+                    return Err(PdnsError::Unauthorized);
+                }
+                Ok(())
+            }
+            Some("cryptokeys") if !p.manage_dnssec => Err(PdnsError::Unauthorized),
+            Some("metadata") => {
+                let kind = rest
+                    .get(1)
+                    .map(String::as_str)
+                    .or_else(|| field("kind").and_then(Value::as_str))
+                    .unwrap_or_default();
+                p.check_metadata_kind(kind)
+                    .map_err(|_| PdnsError::Unauthorized)
+            }
+            _ => Ok(()),
+        },
+        _ => Ok(()),
+    }
+}
+
 async fn audited_write(ctx: WriteCtx<'_>, body: Bytes) -> Response {
+    if let Err(e) = policy_check(&ctx, &body).await {
+        let mut event = ctx.event(match ctx.class {
+            RouteClass::Zone { zone, .. } => Some(zone.to_string()),
+            _ => None,
+        });
+        event.detail =
+            Some(serde_json::json!({"error": "refused by policy", "request": body_detail(&body)}));
+        audit::record(&ctx.state.store, event).await;
+        return e.into_response();
+    }
     match ctx.class {
         RouteClass::ZoneCreate => zone_create(ctx, body).await,
         RouteClass::Zone { zone, rest, .. } if rest.is_empty() => {
@@ -533,6 +657,28 @@ async fn zone_delete(ctx: WriteCtx<'_>, zone: &ZoneName, body: Bytes) -> Respons
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unsafe_paths_are_rejected() {
+        assert_eq!(safe_segments("/api"), Some(vec![]));
+        assert_eq!(
+            safe_segments("/api/v1/servers"),
+            Some(vec!["v1", "servers"])
+        );
+        for bad in [
+            "/api/v1/servers/localhost/zones/a.test./../../tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test./%2e%2e/tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test./%2E/x",
+            "/api/v1/servers/localhost/zones/a.test.%2F..%2Ftsigkeys",
+            "/api/v1/servers/localhost/zones/a.test.%5C..%5Ctsigkeys",
+            "/api/v1//servers",
+            "/api/v1/servers/",
+            "/api/v1/%00",
+            "/apix",
+        ] {
+            assert!(safe_segments(bad).is_none(), "{bad}");
+        }
+    }
 
     #[test]
     fn patch_targets_parse() {

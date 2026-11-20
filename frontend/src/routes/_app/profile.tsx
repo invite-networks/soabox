@@ -149,6 +149,8 @@ function TotpSection() {
   const disable = useTotpDisable();
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string | undefined>();
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | undefined>();
 
   const checkCode = () => {
     if (!CODE.test(code.trim())) {
@@ -163,13 +165,35 @@ function TotpSection() {
     return (
       <Form
         label="Turn off two-factor authentication"
-        onSubmit={() => checkCode() && disable.mutate(code.trim(), { onSuccess: () => setCode("") })}
+        onSubmit={() => {
+          const passwordOk = password.length > 0;
+          setPasswordError(passwordOk ? undefined : "Enter your current password.");
+          if (checkCode() && passwordOk) {
+            disable.mutate(
+              { code: code.trim(), password },
+              {
+                onSuccess: () => {
+                  setCode("");
+                  setPassword("");
+                },
+              },
+            );
+          }
+        }}
       >
         <p className="flex items-center gap-2 text-sm">
           <Badge tone="success">On</Badge> Sign-in asks for a code from your authenticator app.
         </p>
         {disable.isError && <Alert tone="danger">{errorMessage(disable.error)}</Alert>}
-        <div className="max-w-xs">
+        <div className="flex max-w-xs flex-col gap-3">
+          <TextField
+            label="Current password"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            errorMessage={passwordError}
+            autoComplete="current-password"
+          />
           <TextField
             label="Current code"
             value={code}

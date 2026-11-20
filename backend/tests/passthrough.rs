@@ -304,6 +304,11 @@ async fn failed_write_is_recorded_as_failure() {
 #[tokio::test]
 async fn scoped_zone_create_sets_account_and_scope() {
     let pdns = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v1/servers/localhost/zones"))
+        .respond_with(json_ok(ZONES))
+        .mount(&pdns)
+        .await;
     Mock::given(method("POST"))
         .and(path("/api/v1/servers/localhost/zones"))
         .respond_with(|req: &Request| {
@@ -500,4 +505,247 @@ async fn options_preflight_is_forwarded_without_key() {
         headers["access-control-allow-headers"],
         "Content-Type, X-API-Key"
     );
+}
+
+#[tokio::test]
+async fn dot_segment_traversal_is_refused() {
+    let pdns = MockServer::start().await;
+    let h = Harness::new(&pdns.uri()).await;
+    let scoped = h.key(Role::Scoped, &["a.test."], &[], None).await;
+    let operator = h.key(Role::Operator, &[], &[], None).await;
+    for key in [&scoped, &operator] {
+        for uri in [
+            "/api/v1/servers/localhost/zones/a.test./../../tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test./%2e%2e/%2e%2e/tsigkeys",
+            "/api/v1/servers/localhost/zones/a.test.%2F..%2F..%2Ftsigkeys",
+            "/api/v1/servers/localhost/zones/a.test.%5C..%5C..%5Ctsigkeys",
+            "/api/v1/servers/localhost/zones/a.test./../b.test.",
+        ] {
+            let (status, _, body) = h.call("GET", uri, Some(key), "").await;
+            assert_eq!(status, 404, "{uri}");
+            assert_eq!(body, r#"{"error": "Not Found"}"#);
+        }
+    }
+    assert!(
+        pdns.received_requests().await.expect("reqs").is_empty(),
+        "nothing reached PowerDNS"
+    );
+}
+
+async fn owned_key(
+    h: &Harness,
+    owner_role: soabox::store::UserRole,
+    key_role: Role,
+    zones: &[&str],
+) -> (String, i64) {
+    let uid = h
+        .state
+        .store
+        .create_user(&soabox::store::NewUser {
+            username: format!("owner-{}", uuid::Uuid::new_v4().simple()),
+            display_name: String::new(),
+            email: String::new(),
+            role: owner_role,
+            auth_source: "local",
+            oidc_issuer: None,
+            oidc_subject: None,
+            password_hash: None,
+            status: soabox::store::UserStatus::Active,
+        })
+        .await
+        .expect("user");
+    h.state
+        .store
+        .set_user_access(
+            uid,
+            &zones.iter().map(|z| (*z).to_owned()).collect::<Vec<_>>(),
+            &[],
+        )
+        .await
+        .expect("access");
+    let g = soabox::keys::generate().expect("gen");
+    h.state
+        .store
+        .insert_api_key(&soabox::store::NewApiKey {
+            key_hash: g.hash,
+            hint: g.hint,
+            role: Some(key_role),
+            owner_user_id: Some(uid),
+            zones: zones.iter().map(|z| (*z).to_owned()).collect(),
+            ..Default::default()
+        })
+        .await
+        .expect("key");
+    (g.secret, uid)
+}
+
+#[tokio::test]
+async fn keys_follow_their_owner() {
+    use soabox::store::{UserRole, UserStatus};
+    let pdns = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(json_ok("[]"))
+        .mount(&pdns)
+        .await;
+    let h = Harness::new(&pdns.uri()).await;
+    let (key, uid) = owned_key(&h, UserRole::Admin, Role::Admin, &[]).await;
+    let (s, _, _) = h
+        .call("GET", "/api/v1/servers/localhost/tsigkeys", Some(&key), "")
+        .await;
+    assert_eq!(s, 200);
+
+    h.state
+        .store
+        .update_user(uid, "", "", UserRole::User, UserStatus::Active)
+        .await
+        .expect("demote");
+    let (s, _, _) = h
+        .call("GET", "/api/v1/servers/localhost/tsigkeys", Some(&key), "")
+        .await;
+    assert_eq!(s, 401, "a demoted owner's admin key loses admin reach");
+    let (s, _, body) = h
+        .call(
+            "GET",
+            "/api/v1/servers/localhost/zones/x.test.",
+            Some(&key),
+            "",
+        )
+        .await;
+    assert_eq!((s, body.as_str()), (404, r#"{"error": "Not Found"}"#));
+
+    h.state
+        .store
+        .update_user(uid, "", "", UserRole::Admin, UserStatus::Disabled)
+        .await
+        .expect("disable");
+    let (s, _, _) = h.call("GET", "/api/v1/servers", Some(&key), "").await;
+    assert_eq!(s, 401, "a disabled owner's keys stop working");
+}
+
+#[tokio::test]
+async fn user_owned_keys_follow_user_policy() {
+    use soabox::store::UserRole;
+    let pdns = MockServer::start().await;
+    let h = Harness::new(&pdns.uri()).await;
+    let (key, _) = owned_key(&h, UserRole::User, Role::Scoped, &["a.test."]).await;
+    let (s, _, _) = h
+        .call(
+            "DELETE",
+            "/api/v1/servers/localhost/zones/a.test.",
+            Some(&key),
+            "",
+        )
+        .await;
+    assert_eq!(s, 401, "user_can_delete_zones is off");
+    let lua = r#"{"rrsets": [{"name": "x.a.test.", "type": "LUA", "ttl": 60, "changetype": "REPLACE", "records": [{"content": "A \"1.2.3.4\"", "disabled": false}]}]}"#;
+    let (s, _, body) = h
+        .call(
+            "PATCH",
+            "/api/v1/servers/localhost/zones/a.test.",
+            Some(&key),
+            lua,
+        )
+        .await;
+    assert_eq!(s, 422);
+    assert!(body.contains("not allowed"));
+    let (s, _, _) = h
+        .call(
+            "PUT",
+            "/api/v1/servers/localhost/zones/a.test.",
+            Some(&key),
+            r#"{"dnssec": true}"#,
+        )
+        .await;
+    assert_eq!(s, 401, "user_can_manage_dnssec is off");
+    let (s, _, _) = h
+        .call(
+            "PUT",
+            "/api/v1/servers/localhost/zones/a.test.",
+            Some(&key),
+            r#"{"account": "other"}"#,
+        )
+        .await;
+    assert_eq!(s, 401, "scoped keys cannot move zones between accounts");
+    assert!(pdns.received_requests().await.expect("reqs").is_empty());
+    let rows = h
+        .state
+        .store
+        .list_history(&HistoryFilter::default())
+        .await
+        .expect("history");
+    assert!(
+        rows.iter().all(|r| r.outcome == "failure"),
+        "refusals are audited"
+    );
+}
+
+#[tokio::test]
+async fn risky_metadata_and_secondaries_are_admin_only() {
+    let pdns = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v1/servers/localhost/zones"))
+        .respond_with(json_ok(ZONES))
+        .mount(&pdns)
+        .await;
+    let h = Harness::new(&pdns.uri()).await;
+    let operator = h.key(Role::Operator, &[], &[], None).await;
+    let acct = h
+        .state
+        .store
+        .create_account("acme", "")
+        .await
+        .expect("acct");
+    let scoped = h.key(Role::Scoped, &["a.test."], &[], Some(acct)).await;
+    for kind in [
+        "LUA-AXFR-SCRIPT",
+        "AXFR-SOURCE",
+        "ALSO-NOTIFY",
+        "FORWARD-DNSUPDATE",
+    ] {
+        let (s, _, _) = h
+            .call(
+                "PUT",
+                &format!("/api/v1/servers/localhost/zones/a.test./metadata/{kind}"),
+                Some(&operator),
+                r#"{"metadata": ["x"]}"#,
+            )
+            .await;
+        assert_eq!(s, 401, "{kind}");
+    }
+    let (s, _, _) = h
+        .call(
+            "POST",
+            "/api/v1/servers/localhost/zones/a.test./metadata",
+            Some(&scoped),
+            r#"{"kind": "LUA-AXFR-SCRIPT", "metadata": ["x"]}"#,
+        )
+        .await;
+    assert_eq!(s, 401);
+    let (s, _, _) = h
+        .call(
+            "POST",
+            "/api/v1/servers/localhost/zones",
+            Some(&scoped),
+            r#"{"name": "new.test.", "kind": "Slave", "masters": ["10.0.0.1"]}"#,
+        )
+        .await;
+    assert_eq!(s, 401, "scoped keys cannot create secondaries");
+    let (s, _, body) = h
+        .call(
+            "POST",
+            "/api/v1/servers/localhost/zones",
+            Some(&scoped),
+            r#"{"name": "sub.b.test.", "kind": "Native"}"#,
+        )
+        .await;
+    assert_eq!(s, 422, "cannot create a zone below another tenant's zone");
+    assert!(body.contains("overlaps"));
+    let posts = pdns
+        .received_requests()
+        .await
+        .expect("reqs")
+        .iter()
+        .filter(|r| r.method.as_str() != "GET")
+        .count();
+    assert_eq!(posts, 0, "no write reached PowerDNS");
 }

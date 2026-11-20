@@ -1,19 +1,19 @@
 # Configuration Reference
 
-All configuration comes from environment variables. In development, a `.env` file at the repository root is loaded. Any variable marked secret can be given as a file path instead by adding `_FILE` to its name (for example `SOABOX_PDNS_API_KEY_FILE=/run/secrets/pdns_key`).
+All configuration comes from environment variables. In `dev` mode, a `.env` file in the working directory is also loaded. In `prod` mode it is not. Any variable marked secret can be given as a file path instead by adding `_FILE` to its name (for example `SOABOX_PDNS_API_KEY_FILE=/run/secrets/pdns_key`).
 
 | Variable | Required | Default | Secret | Purpose |
 |---|---|---|---|---|
 | `SOABOX_MODE` | Yes | none | | `dev` or `prod`. See [ADR-0011](../adr/0011-configuration-and-runtime-mode.md). |
 | `SOABOX_ENVIRONMENT` | No | none | | Label added to logs. |
 | `SOABOX_BIND` | No | `0.0.0.0:8080` | | Listen address. |
-| `SOABOX_PUBLIC_URL` | Yes | none | | External URL, for OIDC redirects. |
+| `SOABOX_PUBLIC_URL` | Yes | none | | External URL, for OIDC redirects and cookie security. Must be `https` in `prod` mode. |
 | `SOABOX_DATABASE_URL` | No | `sqlite://data/soabox.db` | Yes | `sqlite://...` or `postgres://...`. |
 | `SOABOX_PDNS_URL` | Yes | none | | PowerDNS API base URL, for example `http://pdns:8081`. |
 | `SOABOX_PDNS_API_KEY` | Yes | none | Yes | The PowerDNS API key. Only SOAbox holds it. |
 | `SOABOX_PDNS_SERVER_ID` | No | `localhost` | | PowerDNS server id. |
 | `SOABOX_PDNS_TIMEOUT_SECS` | No | `30` | | Upstream request timeout. |
-| `SOABOX_TRUSTED_PROXIES` | No | empty | | Comma-separated CIDRs allowed to set `X-Forwarded-*`. |
+| `SOABOX_TRUSTED_PROXIES` | Behind a proxy | empty | | Comma-separated CIDRs allowed to set `X-Forwarded-*`. Without it, every client appears as the proxy and shares one rate limit. |
 | `SOABOX_SECRET_KEY` | Yes | none | Yes | 32 random bytes, base64. Encrypts TOTP secrets and signs short-lived sign-in cookies. |
 | `SOABOX_SECRET_KEY_PREVIOUS` | No | none | Yes | Previous key, accepted for decryption during rotation. |
 | `SOABOX_OIDC_ISSUER` | No | none | | Enables OIDC. For Entra: `https://login.microsoftonline.com/<tenant-id>/v2.0`. |

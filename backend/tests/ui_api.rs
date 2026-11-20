@@ -276,7 +276,8 @@ async fn totp_enrollment_and_sign_in() {
         .expect("u")
         .totp_secret_enc
         .expect("enc");
-    let secret = crypto::decrypt(&h.state.secret_keys(), &enc).expect("decrypt");
+    let secret =
+        crypto::decrypt(crypto::PURPOSE_TOTP, &h.state.secret_keys(), &enc).expect("decrypt");
     assert_ne!(enc, secret, "stored encrypted");
     let now = u64::try_from(soabox::store::now()).expect("time");
 
@@ -317,6 +318,17 @@ async fn totp_enrollment_and_sign_in() {
         "/auth/login",
         None,
         Some(json!({"username": "tina", "password": "correct-horse-battery", "totp_code": code})),
+        false,
+    )
+    .await;
+    assert_eq!(r.status, 401, "a code cannot be used twice");
+    let next = crypto::totp_at(&secret, now / 30 + 1);
+    let r = send(
+        &h,
+        "POST",
+        "/auth/login",
+        None,
+        Some(json!({"username": "tina", "password": "correct-horse-battery", "totp_code": next})),
         false,
     )
     .await;
@@ -774,7 +786,7 @@ async fn password_change_and_totp_disable() {
         "DELETE",
         "/v1/me/totp",
         &s,
-        Some(json!({"code": "123456"})),
+        Some(json!({"code": "123456", "password": "new-long-password"})),
     )
     .await;
     assert_eq!(r.status, 400, "not enabled yet");
@@ -788,7 +800,7 @@ async fn password_change_and_totp_disable() {
         .expect("u")
         .totp_secret_enc
         .expect("enc");
-    let secret = crypto::decrypt(&h.state.secret_keys(), &enc).expect("dec");
+    let secret = crypto::decrypt(crypto::PURPOSE_TOTP, &h.state.secret_keys(), &enc).expect("dec");
     let code = crypto::totp_at(
         &secret,
         u64::try_from(soabox::store::now()).expect("t") / 30,
@@ -815,16 +827,52 @@ async fn password_change_and_totp_disable() {
             "DELETE",
             "/v1/me/totp",
             &s,
-            Some(json!({"code": "000000"}))
+            Some(json!({"code": "000000", "password": "new-long-password"}))
         )
         .await
         .status,
         422
     );
+    let next = crypto::totp_at(
+        &secret,
+        u64::try_from(soabox::store::now()).expect("t") / 30 + 1,
+    );
     assert_eq!(
-        call(&h, "DELETE", "/v1/me/totp", &s, Some(json!({"code": code})))
-            .await
-            .status,
+        call(
+            &h,
+            "DELETE",
+            "/v1/me/totp",
+            &s,
+            Some(json!({"code": next, "password": "wrong"}))
+        )
+        .await
+        .status,
+        422,
+        "password is required"
+    );
+    assert_eq!(
+        call(
+            &h,
+            "DELETE",
+            "/v1/me/totp",
+            &s,
+            Some(json!({"code": code, "password": "new-long-password"}))
+        )
+        .await
+        .status,
+        422,
+        "the enable code cannot be replayed"
+    );
+    assert_eq!(
+        call(
+            &h,
+            "DELETE",
+            "/v1/me/totp",
+            &s,
+            Some(json!({"code": next, "password": "new-long-password"}))
+        )
+        .await
+        .status,
         204
     );
     assert!(
@@ -852,7 +900,12 @@ async fn rotate_secrets_and_create_admin_cli() {
     let pdns = MockServer::start().await;
     let h = Harness::new(&pdns.uri()).await;
     let uid = user(&h, "rot", UserRole::User, UserStatus::Active).await;
-    let enc = crypto::encrypt(&h.state.config.secret_key, b"secret-bytes").expect("enc");
+    let enc = crypto::encrypt(
+        crypto::PURPOSE_TOTP,
+        &h.state.config.secret_key,
+        b"secret-bytes",
+    )
+    .expect("enc");
     h.state
         .store
         .set_totp(uid, Some(&enc), true)
@@ -873,7 +926,7 @@ async fn rotate_secrets_and_create_admin_cli() {
         .expect("enc");
     assert_ne!(fresh, enc);
     assert_eq!(
-        crypto::decrypt(&h.state.secret_keys(), &fresh).expect("dec"),
+        crypto::decrypt(crypto::PURPOSE_TOTP, &h.state.secret_keys(), &fresh).expect("dec"),
         b"secret-bytes"
     );
     let pw = soabox::cli::create_admin(&h.state.store, "rescue")
@@ -885,4 +938,71 @@ async fn rotate_secrets_and_create_admin_cli() {
             .await
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn ui_policy_for_metadata_secondaries_and_overlap() {
+    let pdns = pdns_with_zones().await;
+    let h = Harness::new(&pdns.uri()).await;
+    user(&h, "op", UserRole::Operator, UserStatus::Active).await;
+    let uid = user(&h, "u", UserRole::User, UserStatus::Active).await;
+    h.state
+        .store
+        .set_user_access(uid, &["a.test.".into()], &[])
+        .await
+        .expect("access");
+    soabox::settings::Settings::apply(
+        &h.state.store,
+        soabox::settings::SettingsPatch {
+            user_can_create_zones: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("db")
+    .expect("valid");
+    let op = login(&h, "op").await;
+    let r = call(
+        &h,
+        "PUT",
+        "/v1/zones/a.test./metadata/LUA-AXFR-SCRIPT",
+        &op,
+        Some(json!({"metadata": ["x"]})),
+    )
+    .await;
+    assert_eq!(r.status, 403);
+    let u = login(&h, "u").await;
+    let r = call(
+        &h,
+        "POST",
+        "/v1/zones",
+        &u,
+        Some(json!({"name": "s.test", "kind": "Slave", "masters": ["10.0.0.1"]})),
+    )
+    .await;
+    assert_eq!(r.status, 403);
+    let r = call(
+        &h,
+        "POST",
+        "/v1/zones",
+        &u,
+        Some(json!({"name": "x.b.test", "kind": "Native"})),
+    )
+    .await;
+    assert_eq!(r.status, 403);
+    assert!(
+        r.body["detail"]
+            .as_str()
+            .expect("detail")
+            .contains("overlaps")
+    );
+    let r = call(
+        &h,
+        "PUT",
+        "/v1/zones/a.test.",
+        &u,
+        Some(json!({"masters": ["10.0.0.1"]})),
+    )
+    .await;
+    assert_eq!(r.status, 403);
 }

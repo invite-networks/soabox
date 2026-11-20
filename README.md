@@ -80,7 +80,7 @@ Open http://localhost:8080 and sign in as the bootstrap Admin. See [getting star
 | 3 | Web UI: zones and record editor | Done |
 | 4 | Administration: users, accounts, keys, templates, history | Done |
 | 5 | DNSSEC, metadata, TSIG, server views | Done |
-| 6 | Hardening and first release | In progress |
+| 6 | Hardening and first release | Hardening done, release pending maintainer review |
 
 ## Documentation
 
@@ -88,6 +88,7 @@ Open http://localhost:8080 and sign in as the bootstrap Admin. See [getting star
 - [Requirements](docs/spec/requirements.md) and [design](docs/spec/design.md)
 - [API guide](docs/guides/api-guide.md): connecting tools to the PowerDNS-compatible API
 - [Configuration](docs/dev/configuration.md)
+- [Security policy](SECURITY.md)
 
 ## License
 

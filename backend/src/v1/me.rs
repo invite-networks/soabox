@@ -99,12 +99,21 @@ pub async fn change_password(
         .password_hash
         .as_deref()
         .is_some_and(|h| crypto::verify_password(&req.current_password, h));
+    let key = format!("acct:{}", auth.user.id);
+    if state.logins.blocked(&[key.as_str()]) {
+        return Err(ApiError::RateLimited);
+    }
     if !ok {
+        state.logins.fail(&[key.as_str()]);
         return Err(ApiError::Validation("current password is incorrect".into()));
     }
     validate_password(&req.new_password)?;
     let hash = crypto::hash_password(&req.new_password).map_err(ApiError::Internal)?;
     state.store.set_password_hash(auth.user.id, &hash).await?;
+    state
+        .store
+        .delete_other_sessions(auth.user.id, &auth.session_hash)
+        .await?;
     Ok(no_content())
 }
 
@@ -132,7 +141,8 @@ pub async fn totp_setup(
         ));
     }
     let secret = crypto::random_bytes::<20>().map_err(ApiError::Internal)?;
-    let enc = crypto::encrypt(&state.config.secret_key, &secret).map_err(ApiError::Internal)?;
+    let enc = crypto::encrypt(crypto::PURPOSE_TOTP, &state.config.secret_key, &secret)
+        .map_err(ApiError::Internal)?;
     state
         .store
         .set_totp(auth.user.id, Some(&enc), false)
@@ -149,18 +159,38 @@ pub struct TotpCode {
     pub code: String,
 }
 
-fn check_code(state: &AppState, auth: &AuthUser, code: &str) -> Result<(), ApiError> {
+/// A TOTP code and the current password, to turn two-factor sign-in off.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct TotpDisable {
+    pub code: String,
+    pub password: String,
+}
+
+async fn check_code(state: &AppState, auth: &AuthUser, code: &str) -> Result<(), ApiError> {
+    let key = format!("acct:{}", auth.user.id);
+    if state.logins.blocked(&[key.as_str()]) {
+        return Err(ApiError::RateLimited);
+    }
     let secret = auth
         .user
         .totp_secret_enc
         .as_deref()
-        .and_then(|enc| crypto::decrypt(&state.secret_keys(), enc))
+        .and_then(|enc| crypto::decrypt(crypto::PURPOSE_TOTP, &state.secret_keys(), enc))
         .ok_or_else(|| ApiError::BadRequest("start two-factor setup first".into()))?;
     let now = u64::try_from(crate::store::now()).unwrap_or_default();
-    if crypto::totp_check(&secret, code, now) {
-        Ok(())
-    } else {
-        Err(ApiError::Validation("the code is not correct".into()))
+    let last = u64::try_from(auth.user.totp_last_step).unwrap_or_default();
+    match crypto::totp_match(&secret, code, now, last) {
+        Some(step) => {
+            state
+                .store
+                .set_totp_last_step(auth.user.id, i64::try_from(step).unwrap_or(i64::MAX))
+                .await?;
+            Ok(())
+        }
+        None => {
+            state.logins.fail(&[key.as_str()]);
+            Err(ApiError::Validation("the code is not correct".into()))
+        }
     }
 }
 
@@ -171,7 +201,7 @@ pub async fn totp_enable(
     auth: AuthUser,
     Json(req): Json<TotpCode>,
 ) -> Result<axum::http::StatusCode, ApiError> {
-    check_code(&state, &auth, &req.code)?;
+    check_code(&state, &auth, &req.code).await?;
     state
         .store
         .set_totp(auth.user.id, auth.user.totp_secret_enc.as_deref(), true)
@@ -180,16 +210,26 @@ pub async fn totp_enable(
 }
 
 /// `DELETE /v1/me/totp`
-#[utoipa::path(delete, path = "/v1/me/totp", tag = "me", request_body = TotpCode, responses((status = 204)))]
+#[utoipa::path(delete, path = "/v1/me/totp", tag = "me", request_body = TotpDisable, responses((status = 204)))]
 pub async fn totp_disable(
     State(state): State<AppState>,
     auth: AuthUser,
-    Json(req): Json<TotpCode>,
+    Json(req): Json<TotpDisable>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     if !auth.user.totp_enabled {
         return Err(ApiError::BadRequest("two-factor sign-in is not on".into()));
     }
-    check_code(&state, &auth, &req.code)?;
+    let key = format!("acct:{}", auth.user.id);
+    let password_ok = auth
+        .user
+        .password_hash
+        .as_deref()
+        .is_some_and(|h| crypto::verify_password(&req.password, h));
+    if !password_ok {
+        state.logins.fail(&[key.as_str()]);
+        return Err(ApiError::Validation("current password is incorrect".into()));
+    }
+    check_code(&state, &auth, &req.code).await?;
     state.store.set_totp(auth.user.id, None, false).await?;
     Ok(no_content())
 }

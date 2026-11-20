@@ -41,10 +41,10 @@ Related: [Design](design.md) | [Requirements](requirements.md)
 |---|---|---|
 | `GET /v1/me` | | `Me` or `401` |
 | `PUT /v1/me` | `{"display_name", "email"}` | `Me` |
-| `PUT /v1/me/password` | `{"current_password", "new_password"}` | `204`. Local users only. Minimum 12 characters. |
+| `PUT /v1/me/password` | `{"current_password", "new_password"}` | `204`. Local users only. Minimum 12 characters. Ends the user's other sessions. |
 | `POST /v1/me/totp/setup` | | `{"secret", "otpauth_url"}` |
 | `POST /v1/me/totp/enable` | `{"code"}` | `204` |
-| `DELETE /v1/me/totp` | `{"code"}` | `204` |
+| `DELETE /v1/me/totp` | `{"code", "password"}` | `204`. A code is accepted once. |
 
 ## Dashboard And Server
 

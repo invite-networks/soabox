@@ -5,7 +5,8 @@ name: soabox
 
 services:
   soabox:
-    image: ghcr.io/invite-networks/soabox:latest   # pin a digest in production
+    # Pin the release digest, for example ghcr.io/invite-networks/soabox:0.1.0@sha256:...
+    image: ghcr.io/invite-networks/soabox:0.1.0
     env_file: .env
     environment:
       SOABOX_MODE: prod
@@ -14,7 +15,9 @@ services:
     volumes:
       - ./data/soabox:/app/data
     ports:
-      - "8080:8080"
+      # Published on localhost for a reverse proxy on the same host. Use an
+      # internal network instead if the proxy runs elsewhere.
+      - "127.0.0.1:8080:8080"
     read_only: true
     depends_on:
       - postgres
@@ -22,7 +25,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18
+    image: postgres:18@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
     environment:
       POSTGRES_USER: soabox
       POSTGRES_DB: soabox
@@ -32,7 +35,9 @@ services:
     restart: unless-stopped
 
   pdns-init:
-    image: powerdns/pdns-auth-51:5.1.5
+    image: powerdns/pdns-auth-51:5.1.5@sha256:77ff4efdbb9ec30e9309c8a1cbed6121a67fa3be25c848bbbfa756fc75bf9a27
+    # Runs once as root only to create the PowerDNS database and hand the
+    # directory to the pdns user (UID 953) inside the image.
     user: "0"
     entrypoint:
       - sh
@@ -46,7 +51,7 @@ services:
     restart: "no"
 
   pdns:
-    image: powerdns/pdns-auth-51:5.1.5
+    image: powerdns/pdns-auth-51:5.1.5@sha256:77ff4efdbb9ec30e9309c8a1cbed6121a67fa3be25c848bbbfa756fc75bf9a27
     environment:
       PDNS_AUTH_API_KEY: ${PDNS_AUTH_API_KEY:?}
     volumes:
