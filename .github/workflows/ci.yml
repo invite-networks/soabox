@@ -76,6 +76,9 @@ jobs:
           tool: cargo-audit,cargo-deny
       - run: cargo audit
       - run: cargo deny check
+      - name: 72 hour release cooldown
+        working-directory: .
+        run: python3 scripts/cargo-cooldown.py backend/Cargo.lock
 
   image:
     runs-on: ubuntu-latest
