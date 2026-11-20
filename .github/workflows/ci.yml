@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: soabox
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-llvm-cov
+      - name: Start PowerDNS for the compatibility suite
+        working-directory: .
+        run: |
+          printf 'PDNS_AUTH_API_KEY=ci-pdns-key\nSOABOX_MODE=dev\nSOABOX_PUBLIC_URL=http://localhost:8080\nSOABOX_PDNS_API_KEY=ci-pdns-key\nSOABOX_SECRET_KEY=%s\n' "$(openssl rand -base64 32)" > .env
+          mkdir -p data/pdns
+          docker compose up -d --wait pdns
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: Tests with coverage gate
+        env:
+          SOABOX_TEST_POSTGRES_URL: postgres://postgres:ci@localhost:5432/soabox
+          SOABOX_COMPAT_PDNS_URL: http://localhost:8081
+          SOABOX_COMPAT_PDNS_KEY: ci-pdns-key
+        run: cargo llvm-cov nextest --test-threads 1 --fail-under-lines 80
+      - run: cargo test --doc
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+      - run: cargo audit
+      - run: cargo deny check
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: soabox:ci
+          build-args: SOABOX_GIT_SHA=${{ github.sha }}
+      - name: Image runs as UID 1001
+        run: test "$(docker image inspect soabox:ci --format '{{.Config.User}}')" = "1001:1001"

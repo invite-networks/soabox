@@ -1,0 +1,48 @@
+# Development stack: SOAbox and PowerDNS Authoritative 5.
+# Production example: deploy/compose.prod.yaml
+name: soabox
+
+services:
+  pdns-init:
+    image: powerdns/pdns-auth-51:5.1.5
+    user: "0"
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        [ -f /var/lib/powerdns/pdns.sqlite3 ] ||
+        sqlite3 /var/lib/powerdns/pdns.sqlite3 < /usr/local/share/doc/pdns/schema.sqlite3.sql;
+        chown -R 953:953 /var/lib/powerdns
+    volumes:
+      - ./data/pdns:/var/lib/powerdns
+    restart: "no"
+
+  pdns:
+    image: powerdns/pdns-auth-51:5.1.5
+    environment:
+      PDNS_AUTH_API_KEY: ${PDNS_AUTH_API_KEY:?set PDNS_AUTH_API_KEY in .env}
+    volumes:
+      - ./data/pdns:/var/lib/powerdns
+    depends_on:
+      pdns-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:1053:53/udp"
+      - "127.0.0.1:1053:53/tcp"
+      - "127.0.0.1:${PDNS_API_HOST_PORT:-8081}:8081"   # dev only: lets the compatibility tests reach the API
+    restart: unless-stopped
+
+  soabox:
+    build: .
+    env_file: .env
+    environment:
+      SOABOX_PDNS_URL: http://pdns:8081
+      SOABOX_DATABASE_URL: sqlite:///app/data/soabox.db
+      SOABOX_STATIC_DIR: /app/static
+    volumes:
+      - ./data/soabox:/app/data
+    ports:
+      - "127.0.0.1:${SOABOX_HOST_PORT:-8080}:8080"
+    depends_on:
+      - pdns
+    restart: unless-stopped
