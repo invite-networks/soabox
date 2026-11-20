@@ -76,7 +76,7 @@ export function TextField(props: TextFieldProps) {
         />
         {props.suffix && (
           <span
-            className={`flex max-w-[60%] items-center truncate rounded-r-md border border-l-0 border-border-strong bg-surface-hover px-2 text-sm text-fg-muted ${props.mono ? "font-mono" : ""}`}
+            className={`flex shrink-0 items-center whitespace-nowrap rounded-r-md border border-l-0 border-border-strong bg-surface-hover px-2 text-sm text-fg-muted ${props.mono ? "font-mono" : ""}`}
           >
             {props.suffix}
           </span>
