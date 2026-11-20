@@ -1,0 +1,97 @@
+/*
+ * SOAbox theme tokens.
+ *
+ * Every color the interface uses is defined here. To restyle SOAbox, edit the
+ * values below. Light values apply by default. Dark values apply when the
+ * system prefers dark and the user has not chosen light, or when the user
+ * chose dark from the user menu.
+ */
+
+:root {
+  color-scheme: light;
+
+  --sb-font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --sb-font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --sb-bg: #f8fafc;
+  --sb-surface: #ffffff;
+  --sb-surface-muted: #f1f5f9;
+  --sb-surface-hover: #e2e8f0;
+  --sb-border: #e2e8f0;
+  --sb-border-strong: #cbd5e1;
+  --sb-fg: #0f172a;
+  --sb-fg-muted: #475569;
+  --sb-accent: #2563eb;
+  --sb-accent-hover: #1d4ed8;
+  --sb-accent-fg: #ffffff;
+  --sb-accent-soft: #dbeafe;
+  --sb-accent-text: #1d4ed8;
+  --sb-focus: #2563eb;
+  --sb-success: #15803d;
+  --sb-success-soft: #dcfce7;
+  --sb-warning: #b45309;
+  --sb-warning-soft: #fef3c7;
+  --sb-danger: #b91c1c;
+  --sb-danger-hover: #991b1b;
+  --sb-danger-fg: #ffffff;
+  --sb-danger-soft: #fee2e2;
+  --sb-overlay: rgb(15 23 42 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --sb-bg: #020617;
+    --sb-surface: #0f172a;
+    --sb-surface-muted: #1e293b;
+    --sb-surface-hover: #334155;
+    --sb-border: #1e293b;
+    --sb-border-strong: #334155;
+    --sb-fg: #f1f5f9;
+    --sb-fg-muted: #94a3b8;
+    --sb-accent: #60a5fa;
+    --sb-accent-hover: #93c5fd;
+    --sb-accent-fg: #020617;
+    --sb-accent-soft: #172554;
+    --sb-accent-text: #93c5fd;
+    --sb-focus: #60a5fa;
+    --sb-success: #4ade80;
+    --sb-success-soft: #052e16;
+    --sb-warning: #fbbf24;
+    --sb-warning-soft: #451a03;
+    --sb-danger: #f87171;
+    --sb-danger-hover: #fca5a5;
+    --sb-danger-fg: #020617;
+    --sb-danger-soft: #450a0a;
+    --sb-overlay: rgb(2 6 23 / 0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --sb-bg: #020617;
+  --sb-surface: #0f172a;
+  --sb-surface-muted: #1e293b;
+  --sb-surface-hover: #334155;
+  --sb-border: #1e293b;
+  --sb-border-strong: #334155;
+  --sb-fg: #f1f5f9;
+  --sb-fg-muted: #94a3b8;
+  --sb-accent: #60a5fa;
+  --sb-accent-hover: #93c5fd;
+  --sb-accent-fg: #020617;
+  --sb-accent-soft: #172554;
+  --sb-accent-text: #93c5fd;
+  --sb-focus: #60a5fa;
+  --sb-success: #4ade80;
+  --sb-success-soft: #052e16;
+  --sb-warning: #fbbf24;
+  --sb-warning-soft: #451a03;
+  --sb-danger: #f87171;
+  --sb-danger-hover: #fca5a5;
+  --sb-danger-fg: #020617;
+  --sb-danger-soft: #450a0a;
+  --sb-overlay: rgb(2 6 23 / 0.7);
+}

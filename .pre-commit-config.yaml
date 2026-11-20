@@ -23,3 +23,15 @@ repos:
         language: system
         files: ^backend/
         pass_filenames: false
+      - id: biome
+        name: biome
+        entry: bash -c 'cd frontend && pnpm exec biome check --error-on-warnings .'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: tsc
+        name: typecheck
+        entry: bash -c 'cd frontend && pnpm typecheck'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false

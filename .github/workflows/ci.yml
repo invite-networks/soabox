@@ -63,6 +63,46 @@ jobs:
           cargo run --quiet -- openapi > /tmp/openapi.json
           diff -u openapi.json /tmp/openapi.json
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test:coverage
+      - run: pnpm build
+      - run: pnpm audit --prod
+      - name: API types match the backend OpenAPI spec
+        run: node scripts/check-api-types.mjs ../backend/openapi.json
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: cd frontend && pnpm install --frozen-lockfile
+      - name: End-to-end tests against the real stack
+        run: |
+          printf 'PDNS_AUTH_API_KEY=ci-pdns-key\nSOABOX_MODE=prod\nSOABOX_PUBLIC_URL=http://localhost:8080\nSOABOX_PDNS_API_KEY=ci-pdns-key\nSOABOX_SECRET_KEY=%s\nSOABOX_BOOTSTRAP_ADMIN_USERNAME=admin\nSOABOX_BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$(openssl rand -base64 32)" "$(openssl rand -hex 16)" > .env
+          scripts/e2e.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+
   supply-chain:
     runs-on: ubuntu-latest
     defaults:
