@@ -61,3 +61,19 @@ export function splitList(text: string): string[] {
 export function joinList(items: readonly string[]): string {
   return items.join("\n");
 }
+
+/** Formats a TTL in seconds the way operators say it, such as `5m`, `1h`, or `1d`. Odd values stay in seconds. */
+export function formatTtl(seconds: number): string {
+  const units: [number, string][] = [
+    [604800, "w"],
+    [86400, "d"],
+    [3600, "h"],
+    [60, "m"],
+  ];
+  for (const [size, suffix] of units) {
+    if (seconds >= size && seconds % size === 0) {
+      return `${seconds / size}${suffix}`;
+    }
+  }
+  return `${seconds}s`;
+}

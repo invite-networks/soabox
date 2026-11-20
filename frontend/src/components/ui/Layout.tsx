@@ -18,10 +18,10 @@ export function PageHeader({ title, description, actions, eyebrow }: PageHeaderP
     ref.current?.focus({ preventScroll: true });
   }, []);
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
-        {eyebrow && <div className="text-xs text-fg-muted">{eyebrow}</div>}
-        <h1 ref={ref} tabIndex={-1} className="truncate text-xl font-semibold text-fg outline-none">
+        {eyebrow && <div className="text-[13px] text-fg-muted">{eyebrow}</div>}
+        <h1 ref={ref} tabIndex={-1} className="truncate text-2xl font-semibold tracking-tight text-fg outline-none">
           {title}
         </h1>
         {description && <div className="text-sm text-fg-muted">{description}</div>}
@@ -43,11 +43,11 @@ export interface CardProps {
 export function Card({ title, actions, children, flush }: CardProps) {
   return (
     <section
-      className="overflow-hidden rounded-lg border border-border bg-surface"
+      className="overflow-hidden rounded-xl border border-border bg-surface shadow-[0_1px_2px_rgb(15_23_42/0.04)]"
       {...(title ? { "aria-label": title } : {})}
     >
       {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+        <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
           {title && <h2 className="text-sm font-semibold text-fg">{title}</h2>}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>

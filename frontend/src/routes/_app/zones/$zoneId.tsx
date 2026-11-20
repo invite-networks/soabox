@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ChevronRight } from "lucide-react";
 import { z } from "zod";
 import { isApiError } from "../../../api/client";
 import { useZone } from "../../../api/hooks/zones";
@@ -87,17 +88,31 @@ function ZonePage() {
     <>
       <PageHeader
         title={z.name}
-        description={
-          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span>{KIND_LABELS[z.kind] ?? z.kind}</span>
-            <span>
-              Serial <Mono>{z.serial}</Mono>
-            </span>
-            <DnssecBadge enabled={z.dnssec} />
-            {z.account && <span>Account {z.account.name}</span>}
+        eyebrow={
+          <span className="flex items-center gap-1.5">
+            <Link href="/zones">Zones</Link>
+            <ChevronRight aria-hidden className="size-3.5" />
+            <span>{KIND_LABELS[z.kind] ?? z.kind} zone</span>
           </span>
         }
       />
+      <dl className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-5">
+        {[
+          { label: "Kind", value: KIND_LABELS[z.kind] ?? z.kind },
+          { label: "Serial", value: <Mono>{z.serial}</Mono> },
+          { label: "DNSSEC", value: <DnssecBadge enabled={z.dnssec} /> },
+          {
+            label: "Records",
+            value: `${z.rrsets.reduce((n, r) => n + r.records.length, 0)} in ${z.rrsets.length} RRsets`,
+          },
+          { label: "Account", value: z.account?.name ?? <span className="text-fg-muted">Unassigned</span> },
+        ].map((item) => (
+          <div key={item.label} className="flex flex-col gap-1 bg-surface px-4 py-3 last:max-lg:col-span-2">
+            <dt className="text-[11px] font-semibold tracking-wider text-fg-muted uppercase">{item.label}</dt>
+            <dd className="text-sm font-medium text-fg">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
       <Tabs
         selectedKey={tab}
         onSelectionChange={(key) =>

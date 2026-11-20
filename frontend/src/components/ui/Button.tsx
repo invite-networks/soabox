@@ -10,8 +10,10 @@ export interface ButtonProps extends Omit<RACButtonProps, "className" | "style">
 }
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-fg hovered:bg-accent-hover border border-transparent",
-  secondary: "bg-surface text-fg border border-border-strong hovered:bg-surface-hover",
+  primary:
+    "bg-accent text-accent-fg hovered:bg-accent-hover border border-transparent shadow-[0_1px_2px_rgb(15_23_42/0.15)]",
+  secondary:
+    "bg-surface text-fg border border-border-strong hovered:bg-surface-muted shadow-[0_1px_2px_rgb(15_23_42/0.05)]",
   ghost: "bg-transparent text-fg border border-transparent hovered:bg-surface-hover",
   danger: "bg-danger text-danger-fg hovered:bg-danger-hover border border-transparent",
 };

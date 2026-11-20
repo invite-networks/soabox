@@ -122,7 +122,7 @@ function ZonesPage() {
                     <Td>
                       <DnssecBadge enabled={zone.dnssec} />
                     </Td>
-                    <Td>{zone.account?.name ?? <span className="text-fg-muted">None</span>}</Td>
+                    <Td>{zone.account?.name ?? <span className="text-fg-muted">Unassigned</span>}</Td>
                   </Tr>
                 ))}
               </TBody>

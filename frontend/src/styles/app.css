@@ -31,6 +31,19 @@
   --color-danger-fg: var(--sb-danger-fg);
   --color-danger-soft: var(--sb-danger-soft);
   --color-overlay: var(--sb-overlay);
+  --color-sidebar: var(--sb-sidebar-bg);
+  --color-sidebar-fg: var(--sb-sidebar-fg);
+  --color-sidebar-muted: var(--sb-sidebar-muted);
+  --color-sidebar-hover: var(--sb-sidebar-hover);
+  --color-sidebar-active: var(--sb-sidebar-active);
+  --color-sidebar-border: var(--sb-sidebar-border);
+  --color-sidebar-accent: var(--sb-sidebar-accent);
+  --color-violet: var(--sb-violet);
+  --color-violet-soft: var(--sb-violet-soft);
+  --color-cyan: var(--sb-cyan);
+  --color-cyan-soft: var(--sb-cyan-soft);
+  --color-pink: var(--sb-pink);
+  --color-pink-soft: var(--sb-pink-soft);
 }
 
 @layer base {
@@ -41,6 +54,7 @@
     font-family: var(--font-sans);
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
   }
 
   :focus-visible {

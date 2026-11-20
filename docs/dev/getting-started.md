@@ -28,6 +28,20 @@ docker compose exec soabox soabox apikey create --role admin --description local
 curl -H "X-API-Key: <key>" http://localhost:8080/api/v1/servers/localhost/zones
 ```
 
+## Loading Demo Data
+
+`scripts/seed-demo.py` loads sample forward, reverse, signed, and secondary zones through the PowerDNS-compatible API, so each change also appears in history. Every name and address comes from reserved documentation ranges.
+
+```sh
+docker compose exec soabox soabox account create platform
+docker compose exec soabox soabox account create marketing
+docker compose exec soabox soabox account create it
+docker compose exec soabox soabox apikey create --role admin --description demo-seed
+SOABOX_URL=http://localhost:8080 SOABOX_API_KEY=<key> uv run scripts/seed-demo.py
+```
+
+Executed on 2026-11-19 against the development stack. Delete the seed key afterward from API keys.
+
 ## Working On The Backend
 
 ```sh

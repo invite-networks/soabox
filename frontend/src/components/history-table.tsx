@@ -20,6 +20,54 @@ function Outcome({ entry }: { entry: HistoryEntry }) {
   );
 }
 
+const OPERATION_LABELS: Record<string, string> = {
+  "zone.create": "Created zone",
+  "zone.update": "Updated zone",
+  "zone.delete": "Deleted zone",
+  "zone.notify": "Sent NOTIFY",
+  "zone.rectify": "Rectified zone",
+  "zone.axfr_retrieve": "Retrieved zone",
+  "rrsets.patch": "Changed records",
+  "cryptokey.create": "Added DNSSEC key",
+  "cryptokey.update": "Updated DNSSEC key",
+  "cryptokey.delete": "Removed DNSSEC key",
+  "metadata.update": "Updated metadata",
+  "metadata.delete": "Removed metadata",
+  "api_key.create": "Created API key",
+  "api_key.update": "Updated API key",
+  "api_key.enable": "Enabled API key",
+  "api_key.disable": "Disabled API key",
+  "api_key.delete": "Deleted API key",
+  "user.create": "Created user",
+  "user.update": "Updated user",
+  "user.delete": "Deleted user",
+  "user.password_reset": "Reset password",
+  "user.totp_reset": "Reset two-factor",
+  "account.create": "Created account",
+  "account.update": "Updated account",
+  "account.delete": "Deleted account",
+  "template.create": "Created template",
+  "template.update": "Updated template",
+  "template.delete": "Deleted template",
+  "settings.update": "Changed settings",
+};
+
+/** A readable operation name with the raw operation code beneath it. */
+function Operation({ code }: { code: string }) {
+  const label = OPERATION_LABELS[code];
+  if (!label) {
+    return <span className="font-mono text-[13px]">{code}</span>;
+  }
+  return (
+    <span className="flex flex-col leading-tight">
+      <span className="text-fg">{label}</span>
+      <span className="font-mono text-[11px] text-fg-muted">{code}</span>
+    </span>
+  );
+}
+
+const ACTOR_TYPES: Record<string, string> = { user: "user", api_key: "API key", system: "system" };
+
 export interface HistoryTableProps {
   entries: readonly HistoryEntry[];
   label: string;
@@ -73,9 +121,11 @@ export function HistoryTable({ entries, label, showZone = true }: HistoryTablePr
                 <Td>{formatTime(entry.at)}</Td>
                 <Td>
                   <span className="text-fg">{entry.actor_name}</span>{" "}
-                  <span className="text-xs text-fg-muted">{entry.actor_type}</span>
+                  <span className="text-xs text-fg-muted">{ACTOR_TYPES[entry.actor_type] ?? entry.actor_type}</span>
                 </Td>
-                <Td mono>{entry.operation}</Td>
+                <Td>
+                  <Operation code={entry.operation} />
+                </Td>
                 {showZone && (
                   <Td mono>
                     {entry.zone_id ? (
@@ -85,7 +135,7 @@ export function HistoryTable({ entries, label, showZone = true }: HistoryTablePr
                     ) : entry.zone_name ? (
                       entry.zone_name
                     ) : (
-                      <span className="text-fg-muted">None</span>
+                      <span className="font-sans text-fg-muted">Global</span>
                     )}
                   </Td>
                 )}

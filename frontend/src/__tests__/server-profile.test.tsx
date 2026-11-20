@@ -10,7 +10,8 @@ describe("server", () => {
   it("shows version, statistics with a filter, and configuration", async () => {
     const { user, router } = renderApp("/server");
     await findHeading("Server");
-    expect(await screen.findByText("authoritative")).toBeInTheDocument();
+    expect(await screen.findByText(/PowerDNS authoritative/)).toBeInTheDocument();
+    expect(await screen.findByText("Packet cache hit rate")).toBeInTheDocument();
     const stats = await screen.findByRole("table", { name: "Statistics" });
     expect(within(stats).getByText("A=10")).toBeInTheDocument();
     await user.type(screen.getByRole("searchbox", { name: "Filter statistics" }), "udp");
