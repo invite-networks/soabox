@@ -19,12 +19,12 @@ Disable or delete it in the UI or with `soabox apikey disable <id>`. It stops wo
 ## SOABOX_SECRET_KEY
 
 1. Move the current value to `SOABOX_SECRET_KEY_PREVIOUS` and set a new `SOABOX_SECRET_KEY`.
-2. Restart SOAbox. Run `soabox rotate-secrets` to re-encrypt stored TOTP secrets with the new key.
+2. Restart SOAbox. Run `soabox rotate-secrets` to re-encrypt stored TOTP secrets and the OIDC client secret saved in the UI with the new key.
 3. Remove `SOABOX_SECRET_KEY_PREVIOUS` and restart.
 
 ## OIDC Client Secret
 
-Create a new secret in the provider, update `SOABOX_OIDC_CLIENT_SECRET`, restart, test sign-in, then delete the old secret in the provider.
+Create a new secret in the provider. If single sign-on is set up in the UI, open **Settings > Single sign-on**, choose **Replace secret**, paste the new value, and save. No restart is needed. If it is set by environment, update `SOABOX_OIDC_CLIENT_SECRET` and restart. Test sign-in, then delete the old secret in the provider.
 
 ## Removing A Person's Access
 

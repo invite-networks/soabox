@@ -10,6 +10,7 @@ use utoipa::ToSchema;
 use super::me::{validate_password, validate_profile};
 use super::{no_content, record};
 use crate::audit;
+use crate::auth::provider::{self, OidcSettings, OidcSettingsUpdate};
 use crate::auth::{AuthUser, crypto};
 use crate::errors::ApiError;
 use crate::pdns::ZoneName;
@@ -637,6 +638,51 @@ pub async fn put_settings(
     )
     .await;
     Ok(Json(s))
+}
+
+/// `GET /v1/settings/oidc`
+#[utoipa::path(get, path = "/v1/settings/oidc", tag = "admin", responses((status = 200, body = OidcSettings)))]
+pub async fn get_oidc_settings(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<OidcSettings>, ApiError> {
+    AuthUser::require(auth.permissions(&state).await?.manage_settings)?;
+    Ok(Json(provider::view(&state).await?))
+}
+
+/// `PUT /v1/settings/oidc`. The client secret is write-only.
+#[utoipa::path(put, path = "/v1/settings/oidc", tag = "admin", request_body = OidcSettingsUpdate,
+    responses((status = 200, body = OidcSettings), (status = 409, body = crate::errors::ErrorBody), (status = 422, body = crate::errors::ErrorBody)))]
+pub async fn put_oidc_settings(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Json(req): Json<OidcSettingsUpdate>,
+) -> Result<Json<OidcSettings>, ApiError> {
+    AuthUser::require(auth.permissions(&state).await?.manage_settings)?;
+    let result = provider::save(&state, &req).await;
+    let p = auth.principal(&state).await?;
+    let secret_changed = req
+        .client_secret
+        .as_deref()
+        .is_some_and(|s| !s.trim().is_empty());
+    record(
+        &state,
+        &auth,
+        &p,
+        "settings.oidc_update",
+        None,
+        result.as_ref().map(|_| ()),
+        None,
+        Some(json!({
+            "enabled": req.enabled,
+            "issuer": req.issuer.trim(),
+            "client_id": req.client_id.trim(),
+            "button_label": req.button_label.trim(),
+            "client_secret_changed": secret_changed,
+        })),
+    )
+    .await;
+    Ok(Json(result?))
 }
 
 async fn require_tsig(state: &AppState, auth: &AuthUser) -> Result<(), ApiError> {

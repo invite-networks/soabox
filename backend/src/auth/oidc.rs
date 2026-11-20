@@ -9,14 +9,15 @@ use axum::http::{HeaderMap, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use base64::Engine;
-use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
+use openidconnect::core::{CoreAuthenticationFlow, CoreClient};
 use openidconnect::{
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, PkceCodeChallenge,
+    AuthorizationCode, ClientId, ClientSecret, CsrfToken, Nonce, PkceCodeChallenge,
     PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
 };
 use serde::{Deserialize, Serialize};
 
-use super::crypto;
+use super::{crypto, provider};
+use crate::config::OidcConfig;
 use crate::errors::ApiError;
 use crate::http::ClientInfo;
 use crate::settings::{NewOidcUser, Settings};
@@ -53,7 +54,7 @@ fn decode_flow(keys: &[&[u8; 32]], raw: &str) -> Option<FlowState> {
     serde_json::from_slice(&json).ok()
 }
 
-fn http_client() -> Result<openidconnect::reqwest::Client, ApiError> {
+pub(super) fn http_client() -> Result<openidconnect::reqwest::Client, ApiError> {
     openidconnect::reqwest::ClientBuilder::new()
         .redirect(openidconnect::reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(15))
@@ -61,32 +62,33 @@ fn http_client() -> Result<openidconnect::reqwest::Client, ApiError> {
         .map_err(ApiError::internal)
 }
 
-async fn metadata(state: &AppState) -> Result<CoreProviderMetadata, ApiError> {
-    let cfg = state
-        .config
-        .oidc
-        .as_ref()
+/// The active provider settings and a client built from its discovery
+/// document. Answers `404` when single sign-on is off.
+async fn client(state: &AppState) -> Result<(OidcConfig, Client), ApiError> {
+    let cfg = provider::active(state)
+        .await?
         .ok_or_else(|| ApiError::NotFound("single sign-on".into()))?;
-    let cell = state.oidc_metadata.clone();
-    let meta = cell
-        .get_or_try_init(|| async {
-            let issuer = IssuerUrl::new(cfg.issuer.as_str().trim_end_matches('/').to_owned())
-                .map_err(ApiError::internal)?;
-            CoreProviderMetadata::discover_async(issuer, &http_client()?)
-                .await
-                .map_err(|e| {
-                    tracing::warn!(error = %e, "OIDC discovery failed");
-                    ApiError::UpstreamUnavailable
-                })
-        })
-        .await?;
-    Ok(meta.clone())
+    let meta = state.oidc_metadata.get(&cfg.issuer).await?;
+    let client = CoreClient::from_provider_metadata(
+        meta,
+        ClientId::new(cfg.client_id.clone()),
+        Some(ClientSecret::new(cfg.client_secret.expose().to_owned())),
+    )
+    .set_redirect_uri(
+        RedirectUrl::new(provider::redirect_uri(&state.config.public_url))
+            .map_err(ApiError::internal)?,
+    );
+    Ok((cfg, client))
 }
 
-fn redirect_url(state: &AppState) -> Result<RedirectUrl, ApiError> {
-    let base = state.config.public_url.as_str().trim_end_matches('/');
-    RedirectUrl::new(format!("{base}/auth/oidc/callback")).map_err(ApiError::internal)
-}
+type Client = CoreClient<
+    openidconnect::EndpointSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointMaybeSet,
+    openidconnect::EndpointMaybeSet,
+>;
 
 fn login_error(code: &str) -> Response {
     Redirect::to(&format!("/login?error={code}")).into_response()
@@ -94,18 +96,7 @@ fn login_error(code: &str) -> Response {
 
 /// `GET /auth/oidc/start`
 pub async fn start(State(state): State<AppState>, jar: CookieJar) -> Result<Response, ApiError> {
-    let cfg = state
-        .config
-        .oidc
-        .clone()
-        .ok_or_else(|| ApiError::NotFound("single sign-on".into()))?;
-    let meta = metadata(&state).await?;
-    let client = CoreClient::from_provider_metadata(
-        meta,
-        ClientId::new(cfg.client_id.clone()),
-        Some(ClientSecret::new(cfg.client_secret.expose().to_owned())),
-    )
-    .set_redirect_uri(redirect_url(&state)?);
+    let (_cfg, client) = client(&state).await?;
     let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
     let (url, csrf, nonce) = client
         .authorize_url(
@@ -152,9 +143,9 @@ pub async fn callback(
     jar: CookieJar,
     Query(q): Query<CallbackQuery>,
 ) -> Result<Response, ApiError> {
-    let Some(cfg) = state.config.oidc.clone() else {
+    if provider::active(&state).await?.is_none() {
         return Err(ApiError::NotFound("single sign-on".into()));
-    };
+    }
     let flow = jar
         .get(FLOW_COOKIE)
         .and_then(|c| decode_flow(&state.secret_keys(), c.value()));
@@ -175,13 +166,7 @@ pub async fn callback(
         return Ok((jar, login_error("oidc_failed")).into_response());
     }
 
-    let meta = metadata(&state).await?;
-    let client = CoreClient::from_provider_metadata(
-        meta,
-        ClientId::new(cfg.client_id.clone()),
-        Some(ClientSecret::new(cfg.client_secret.expose().to_owned())),
-    )
-    .set_redirect_uri(redirect_url(&state)?);
+    let (_cfg, client) = client(&state).await?;
     let http = http_client()?;
     let token = match client.exchange_code(AuthorizationCode::new(code)) {
         Ok(req) => {

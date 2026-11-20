@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
 import { describe, expect, it } from "vitest";
-import { accounts, settings, tsigKeys, users } from "../test/fixtures";
+import type { OidcSettings, OidcSettingsUpdate } from "../api/types";
+import { accounts, oidcSettings, settings, tsigKeys, users } from "../test/fixtures";
 import { apiError, json, noContent } from "../test/handlers";
 import { findHeading, pickZone, renderApp } from "../test/render";
 import { recordMutations, server } from "../test/server";
@@ -205,6 +206,114 @@ describe("settings", () => {
     const { user } = renderApp("/admin/settings");
     await user.click(await screen.findByRole("button", { name: "Save settings" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Unknown record type");
+  });
+});
+
+describe("single sign-on settings", () => {
+  const issuer = "https://login.microsoftonline.com/tenant-id/v2.0";
+
+  it("configures the provider and never shows the secret again", async () => {
+    const calls = recordMutations();
+    server.use(
+      http.put("/v1/settings/oidc", async ({ request }) => {
+        const { client_secret: _secret, ...body } = (await request.json()) as OidcSettingsUpdate;
+        return json<OidcSettings>({ ...oidcSettings, ...body, client_secret_set: true });
+      }),
+    );
+    const { user } = renderApp("/admin/settings");
+    const card = await screen.findByRole("region", { name: "Single sign-on" });
+    expect(within(card).getByText(oidcSettings.redirect_uri)).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Copy redirect URI" })).toBeInTheDocument();
+
+    await user.click(within(card).getByRole("switch", { name: /Single sign-on enabled/ }));
+    await user.type(within(card).getByLabelText("Issuer URL"), "not a url");
+    await user.click(within(card).getByRole("button", { name: "Save single sign-on" }));
+    expect(within(card).getByText("Enter the issuer as a full https URL.")).toBeInTheDocument();
+    expect(within(card).getByText("Enter the client ID.")).toBeInTheDocument();
+    expect(within(card).getByText("Enter the client secret.")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+
+    await user.clear(within(card).getByLabelText("Issuer URL"));
+    await user.type(within(card).getByLabelText("Issuer URL"), issuer);
+    await user.type(within(card).getByLabelText("Client ID"), "client-1");
+    await user.type(within(card).getByLabelText("Client secret"), "s3cret-value");
+    await user.clear(within(card).getByLabelText("Button label"));
+    await user.type(within(card).getByLabelText("Button label"), "Sign in with Microsoft");
+    await user.click(within(card).getByRole("button", { name: "Save single sign-on" }));
+
+    expect(await within(card).findByText("Single sign-on saved.")).toBeInTheDocument();
+    expect(calls[0]).toMatchObject({
+      method: "PUT",
+      path: "/v1/settings/oidc",
+      body: {
+        enabled: true,
+        issuer,
+        client_id: "client-1",
+        client_secret: "s3cret-value",
+        button_label: "Sign in with Microsoft",
+      },
+    });
+    expect(within(card).getByText("Secret is set")).toBeInTheDocument();
+    expect(within(card).queryByLabelText("Client secret")).not.toBeInTheDocument();
+    expect(card).not.toHaveTextContent("s3cret-value");
+  });
+
+  it("keeps the stored secret unless it is replaced", async () => {
+    const calls = recordMutations();
+    const stored = { ...oidcSettings, enabled: true, issuer, client_id: "client-1", client_secret_set: true };
+    server.use(
+      http.get("/v1/settings/oidc", () => json(stored)),
+      http.put("/v1/settings/oidc", () => json(stored)),
+    );
+    const { user } = renderApp("/admin/settings");
+    const card = await screen.findByRole("region", { name: "Single sign-on" });
+    expect(await within(card).findByText("Secret is set")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Save single sign-on" }));
+    await within(card).findByText("Single sign-on saved.");
+    expect(calls[0]?.body).toEqual({
+      enabled: true,
+      issuer,
+      client_id: "client-1",
+      button_label: "Sign in with SSO",
+    });
+
+    await user.click(within(card).getByRole("button", { name: "Replace secret" }));
+    await user.type(within(card).getByLabelText("Client secret"), "rotated");
+    await user.click(within(card).getByRole("button", { name: "Save single sign-on" }));
+    await waitFor(() => expect(calls).toHaveLength(2));
+    await waitFor(() => expect(calls[1]?.body).toMatchObject({ client_secret: "rotated" }));
+  });
+
+  it("shows environment settings read-only", async () => {
+    server.use(
+      http.get("/v1/settings/oidc", () =>
+        json({
+          ...oidcSettings,
+          source: "environment",
+          enabled: true,
+          issuer,
+          client_id: "env-client",
+          client_secret_set: true,
+        }),
+      ),
+    );
+    renderApp("/admin/settings");
+    const card = await screen.findByRole("region", { name: "Single sign-on" });
+    expect(await within(card).findByText("Set by environment")).toBeInTheDocument();
+    expect(within(card).getByLabelText("Client ID")).toHaveAttribute("readonly");
+    expect(within(card).getByLabelText("Issuer URL")).toHaveValue(issuer);
+    expect(within(card).getByRole("switch", { name: /Single sign-on enabled/ })).toBeDisabled();
+    expect(within(card).getByText("Secret is set")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Replace secret" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Save single sign-on" })).not.toBeInTheDocument();
+  });
+
+  it("shows server validation errors", async () => {
+    server.use(http.put("/v1/settings/oidc", () => apiError(422, "VALIDATION_ERROR", "the issuer must use https")));
+    const { user } = renderApp("/admin/settings");
+    const card = await screen.findByRole("region", { name: "Single sign-on" });
+    await user.click(within(card).getByRole("button", { name: "Save single sign-on" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("the issuer must use https");
   });
 });
 

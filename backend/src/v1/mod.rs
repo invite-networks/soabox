@@ -85,6 +85,10 @@ pub fn router() -> Router<AppState> {
             "/settings",
             get(admin::get_settings).put(admin::put_settings),
         )
+        .route(
+            "/settings/oidc",
+            get(admin::get_oidc_settings).put(admin::put_oidc_settings),
+        )
         .route("/tsigkeys", get(admin::list_tsig).post(admin::create_tsig))
         .route(
             "/tsigkeys/{id}",

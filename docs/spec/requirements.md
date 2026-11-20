@@ -100,6 +100,9 @@ Each requirement has a stable ID. IDs are never reused. Acceptance criteria are 
 | FR-AUTH-07 | Sessions are server-side, rotated on sign-in and role change, and expire after configurable idle and absolute timeouts. | Session tests with a controlled clock. |
 | FR-AUTH-08 | Sign-in attempts are rate limited per account and per client IP. | Rate limit tests. |
 | FR-AUTH-09 | Users can sign out, and Admins can end a user's sessions. | Session revocation tests. |
+| FR-AUTH-10 | Admins configure OpenID Connect in the UI: enabled, issuer URL, client ID, client secret, and button label. The UI shows the redirect URI to register with the provider. The issuer must be `https` (`http` is accepted only in `dev` mode). The client ID and secret are required when enabled. Changes apply to the next sign-in without a restart. | `/v1/settings/oidc` integration tests, including a change of client ID taking effect on the next sign-in. Component tests for the form. |
+| FR-AUTH-11 | The OIDC client secret is write-only. It is stored encrypted under `SOABOX_SECRET_KEY`, never returned by the API or written to history, and re-encrypted by `soabox rotate-secrets`. Saving the settings is recorded in history without the secret. | Tests that read responses, the database, and history for the secret. Rotation test. |
+| FR-AUTH-12 | When `SOABOX_OIDC_ISSUER` is set, the `SOABOX_OIDC_*` variables take precedence over the settings stored in the UI. The UI then shows them read-only, marked as set by environment, and the API refuses changes with `409`. | Precedence integration test. Component test for the read-only view. |
 
 ### 4.6 Authorization and accounts
 

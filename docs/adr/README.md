@@ -18,5 +18,6 @@ Each ADR records one consequential decision: its context, the alternatives, what
 | [0012](0012-distribution.md) | Container image and Compose examples | Accepted |
 | [0013](0013-api-key-hashing.md) | SHA-256 digests for API keys | Accepted |
 | [0014](0014-license.md) | Apache-2.0 license | Accepted |
+| [0015](0015-oidc-settings-in-ui.md) | OIDC provider settings managed in the UI, environment overrides | Accepted |
 
 Maintenance rules: accepted ADRs are never edited to change the decision. A changed decision gets a new ADR that supersedes the old one, and both index rows are updated.

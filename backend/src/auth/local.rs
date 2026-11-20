@@ -81,11 +81,11 @@ impl Me {
 #[utoipa::path(get, path = "/auth/config", tag = "auth", responses((status = 200, body = AuthConfig)))]
 pub async fn config(State(state): State<AppState>) -> Result<Json<AuthConfig>, ApiError> {
     let s = Settings::load(&state.store).await?;
-    let oidc = state.config.oidc.as_ref();
+    let oidc = super::provider::active(&state).await?;
     Ok(Json(AuthConfig {
         local_enabled: oidc.is_none() || s.local_login_with_oidc == LocalLogin::Allow,
         oidc_enabled: oidc.is_some(),
-        oidc_label: oidc.map(|o| o.button_label.clone()).unwrap_or_default(),
+        oidc_label: oidc.map(|o| o.button_label).unwrap_or_default(),
     }))
 }
 
@@ -140,9 +140,9 @@ pub async fn login(
     }
 
     let settings = Settings::load(&state.store).await?;
-    if state.config.oidc_enabled()
-        && settings.local_login_with_oidc == LocalLogin::Deny
+    if settings.local_login_with_oidc == LocalLogin::Deny
         && user.role != UserRole::Admin
+        && super::provider::active(&state).await?.is_some()
     {
         return Err(ApiError::Forbidden(
             "local sign-in is turned off, use single sign-on".into(),

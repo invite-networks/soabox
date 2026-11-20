@@ -735,6 +735,72 @@
         }
       }
     },
+    "/v1/settings/oidc": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`GET /v1/settings/oidc`",
+        "operationId": "get_oidc_settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "`PUT /v1/settings/oidc`. The client secret is write-only.",
+        "operationId": "put_oidc_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OidcSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettings"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/templates": {
       "get": {
         "tags": [
@@ -2395,6 +2461,82 @@
             ]
           }
         }
+      },
+      "OidcSettings": {
+        "type": "object",
+        "description": "The provider settings as an Admin sees them. The secret is never included.",
+        "required": [
+          "source",
+          "enabled",
+          "issuer",
+          "client_id",
+          "client_secret_set",
+          "button_label",
+          "redirect_uri"
+        ],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/OidcSource",
+            "description": "Where the settings in force come from."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True when single sign-on is offered on the sign-in page."
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret_set": {
+            "type": "boolean",
+            "description": "True when a client secret is stored. The value is never returned."
+          },
+          "button_label": {
+            "type": "string"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "description": "The callback URL to register with the provider."
+          }
+        }
+      },
+      "OidcSettingsUpdate": {
+        "type": "object",
+        "description": "Changes to the provider settings.",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new client secret. Omit or leave empty to keep the stored one."
+          },
+          "button_label": {
+            "type": "string"
+          }
+        }
+      },
+      "OidcSource": {
+        "type": "string",
+        "description": "Where the active provider settings come from.",
+        "enum": [
+          "environment",
+          "database"
+        ]
       },
       "PasswordChange": {
         "type": "object",

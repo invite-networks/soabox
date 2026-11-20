@@ -55,6 +55,8 @@ pub fn token_digest(token: &str) -> String {
 pub const PURPOSE_TOTP: &[u8] = b"soabox/totp/v1";
 /// Associated data for the encrypted OIDC flow cookie.
 pub const PURPOSE_OIDC_FLOW: &[u8] = b"soabox/oidc-flow/v1";
+/// Associated data for the stored OIDC client secret.
+pub const PURPOSE_OIDC_CLIENT_SECRET: &[u8] = b"soabox/oidc-client-secret/v1";
 
 /// Encrypts with XChaCha20-Poly1305, bound to `purpose` as associated data
 /// so a ciphertext made for one use cannot be accepted for another. Output
