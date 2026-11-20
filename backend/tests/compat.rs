@@ -399,3 +399,69 @@ async fn writes_produce_identical_zones() {
     );
     assert_eq!(history[4].outcome, "failure");
 }
+
+#[tokio::test]
+async fn options_matches_powerdns() {
+    let c = compat_or_skip!();
+    let headers = [
+        "access-control-allow-methods",
+        "access-control-allow-headers",
+        "access-control-max-age",
+        "content-type",
+    ];
+    for uri in [
+        "/api",
+        "/api/v1",
+        "/api/docs",
+        "/api/v1/servers",
+        "/api/v1/servers/localhost",
+        "/api/v1/servers/localhost/cache/flush",
+        "/api/v1/servers/localhost/config",
+        "/api/v1/servers/localhost/config/x",
+        "/api/v1/servers/localhost/search-data",
+        "/api/v1/servers/localhost/statistics",
+        "/api/v1/servers/localhost/zones",
+        "/api/v1/servers/localhost/zones/z.compat.",
+        "/api/v1/servers/localhost/zones/z.compat./axfr-retrieve",
+        "/api/v1/servers/localhost/zones/z.compat./notify",
+        "/api/v1/servers/localhost/zones/z.compat./export",
+        "/api/v1/servers/localhost/zones/z.compat./rectify",
+        "/api/v1/servers/localhost/zones/z.compat./cryptokeys",
+        "/api/v1/servers/localhost/zones/z.compat./cryptokeys/1",
+        "/api/v1/servers/localhost/zones/z.compat./metadata",
+        "/api/v1/servers/localhost/zones/z.compat./metadata/X",
+        "/api/v1/servers/localhost/zones/z.compat./bogus",
+        "/api/v1/servers/localhost/tsigkeys",
+        "/api/v1/servers/localhost/tsigkeys/k",
+        "/api/v1/servers/localhost/autoprimaries",
+        "/api/v1/servers/localhost/autoprimaries/192.0.2.1/ns",
+        "/api/v1/servers/localhost/views",
+        "/api/v1/servers/localhost/views/v",
+        "/api/v1/servers/localhost/views/v/z.compat.",
+        "/api/v1/servers/localhost/networks",
+        "/api/v1/servers/localhost/networks/192.0.2.0/24",
+        "/api/v1/servers/other",
+        "/api/v1/servers/localhost/bogus",
+    ] {
+        let direct = c
+            .direct
+            .request(reqwest::Method::OPTIONS, format!("{}{uri}", c.base))
+            .send()
+            .await
+            .expect("direct");
+        let (status, got, body) = c.h.call("OPTIONS", uri, None, "").await;
+        assert_eq!(status, direct.status().as_u16(), "OPTIONS {uri}");
+        for name in headers {
+            assert_eq!(
+                got.get(name)
+                    .map(|v| v.to_str().unwrap_or_default().to_owned()),
+                direct
+                    .headers()
+                    .get(name)
+                    .map(|v| v.to_str().unwrap_or_default().to_owned()),
+                "OPTIONS {uri} {name}"
+            );
+        }
+        assert_eq!(body, direct.text().await.expect("text"), "OPTIONS {uri}");
+    }
+}

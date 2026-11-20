@@ -488,22 +488,33 @@ async fn health_endpoints_and_security_headers() {
 }
 
 #[tokio::test]
-async fn options_preflight_is_forwarded_without_key() {
+async fn options_is_answered_locally_without_reaching_powerdns() {
     let pdns = MockServer::start().await;
-    Mock::given(method("OPTIONS"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("access-control-allow-headers", "Content-Type, X-API-Key"),
-        )
-        .expect(1)
-        .mount(&pdns)
-        .await;
     let h = Harness::new(&pdns.uri()).await;
-    let (status, headers, _) = h.call("OPTIONS", "/api/v1/servers", None, "").await;
+    let (status, headers, body) = h
+        .call(
+            "OPTIONS",
+            "/api/v1/servers/localhost/zones/a.test.",
+            None,
+            "",
+        )
+        .await;
     assert_eq!(status, 200);
+    assert_eq!(
+        headers["access-control-allow-methods"],
+        "GET, PATCH, PUT, DELETE, OPTIONS"
+    );
     assert_eq!(
         headers["access-control-allow-headers"],
         "Content-Type, X-API-Key"
+    );
+    assert_eq!(headers["access-control-max-age"], "3600");
+    assert!(body.is_empty());
+    let (status, _, _) = h.call("OPTIONS", "/api/v1/servers/other", None, "").await;
+    assert_eq!(status, 404);
+    assert!(
+        pdns.received_requests().await.expect("reqs").is_empty(),
+        "OPTIONS never reaches PowerDNS with the SOAbox PowerDNS key"
     );
 }
 
@@ -748,4 +759,94 @@ async fn risky_metadata_and_secondaries_are_admin_only() {
         .filter(|r| r.method.as_str() != "GET")
         .count();
     assert_eq!(posts, 0, "no write reached PowerDNS");
+}
+
+#[tokio::test]
+async fn user_key_loses_zone_creation_when_owner_leaves_account() {
+    use soabox::store::UserRole;
+    let pdns = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/v1/servers/localhost/zones"))
+        .respond_with(json_ok(ZONES))
+        .mount(&pdns)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/servers/localhost/zones"))
+        .respond_with(
+            ResponseTemplate::new(201)
+                .insert_header("content-type", "application/json")
+                .set_body_string(
+                    json!({"id": "new.test.", "name": "new.test.", "account": "acme", "rrsets": []})
+                        .to_string(),
+                ),
+        )
+        .expect(1)
+        .mount(&pdns)
+        .await;
+    let h = Harness::new(&pdns.uri()).await;
+    soabox::settings::Settings::apply(
+        &h.state.store,
+        soabox::settings::SettingsPatch {
+            user_can_create_zones: Some(true),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("db")
+    .expect("valid");
+    let acct = h
+        .state
+        .store
+        .create_account("acme", "")
+        .await
+        .expect("acct");
+    let (_, uid) = owned_key(&h, UserRole::User, Role::Scoped, &[]).await;
+    h.state
+        .store
+        .set_user_access(uid, &[], &[acct])
+        .await
+        .expect("member");
+    let g = soabox::keys::generate().expect("gen");
+    h.state
+        .store
+        .insert_api_key(&soabox::store::NewApiKey {
+            key_hash: g.hash,
+            hint: g.hint,
+            role: Some(Role::Scoped),
+            owner_user_id: Some(uid),
+            create_account_id: Some(acct),
+            ..Default::default()
+        })
+        .await
+        .expect("key");
+    let key = g.secret;
+    let create = |name: &str| format!(r#"{{"name": "{name}", "kind": "Native"}}"#);
+
+    let (s, _, _) = h
+        .call(
+            "POST",
+            "/api/v1/servers/localhost/zones",
+            Some(&key),
+            &create("new.test."),
+        )
+        .await;
+    assert_eq!(s, 201, "a member can create zones in the account");
+
+    h.state
+        .store
+        .set_user_access(uid, &[], &[])
+        .await
+        .expect("remove");
+    let (s, _, _) = h
+        .call(
+            "POST",
+            "/api/v1/servers/localhost/zones",
+            Some(&key),
+            &create("later.test."),
+        )
+        .await;
+    assert_eq!(
+        s, 401,
+        "removal from the account revokes zone creation at once"
+    );
 }

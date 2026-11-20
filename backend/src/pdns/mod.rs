@@ -2,6 +2,7 @@
 
 pub mod json;
 pub mod model;
+pub mod options;
 pub mod zone_id;
 
 use std::time::Duration;

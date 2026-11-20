@@ -29,6 +29,10 @@ pub const MAX_BUTTON_LABEL: usize = 64;
 /// provider signing key rotation is picked up.
 pub const METADATA_TTL: Duration = Duration::from_secs(3600);
 
+/// Shortest time between forced refreshes for an unknown signing key, so a
+/// stream of bad tokens cannot make SOAbox hammer the provider.
+pub const METADATA_MIN_REFRESH: Duration = Duration::from_secs(60);
+
 /// Where the active provider settings come from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -67,11 +71,27 @@ impl MetadataCache {
 
     /// The discovery document for `issuer`, fetched when missing or stale.
     pub async fn get(&self, issuer: &Url) -> Result<CoreProviderMetadata, ApiError> {
+        self.load(issuer, METADATA_TTL).await
+    }
+
+    /// Fetches the discovery document and signing keys again, for an ID token
+    /// signed with a key the cached set does not contain. Refreshes at most
+    /// once per [`METADATA_MIN_REFRESH`]. A failed fetch keeps the cached
+    /// document and returns the error, so sign-in fails closed.
+    pub async fn refresh(&self, issuer: &Url) -> Result<CoreProviderMetadata, ApiError> {
+        self.load(issuer, METADATA_MIN_REFRESH).await
+    }
+
+    async fn load(
+        &self,
+        issuer: &Url,
+        max_age: Duration,
+    ) -> Result<CoreProviderMetadata, ApiError> {
         let issuer = issuer.as_str().trim_end_matches('/').to_owned();
         let mut slot = self.inner.lock().await;
         if let Some(c) = slot.as_ref()
             && c.issuer == issuer
-            && c.fetched.elapsed() < METADATA_TTL
+            && c.fetched.elapsed() < max_age
         {
             return Ok(c.metadata.clone());
         }
@@ -325,6 +345,82 @@ pub async fn rotate_secret(state: &AppState) -> anyhow::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    async fn mount_discovery(idp: &MockServer) {
+        let issuer = format!("{}/tenant", idp.uri());
+        Mock::given(method("GET"))
+            .and(path("/tenant/.well-known/openid-configuration"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issuer": issuer,
+                "authorization_endpoint": format!("{issuer}/authorize"),
+                "token_endpoint": format!("{issuer}/token"),
+                "jwks_uri": format!("{issuer}/keys"),
+                "response_types_supported": ["code"],
+                "subject_types_supported": ["public"],
+                "id_token_signing_alg_values_supported": ["RS256"],
+            })))
+            .mount(idp)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/tenant/keys"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"keys": []})))
+            .mount(idp)
+            .await;
+    }
+
+    async fn discoveries(idp: &MockServer) -> usize {
+        idp.received_requests()
+            .await
+            .unwrap_or_default()
+            .iter()
+            .filter(|r| r.url.path().ends_with("openid-configuration"))
+            .count()
+    }
+
+    async fn age(cache: &MetadataCache, by: Duration) {
+        let mut slot = cache.inner.lock().await;
+        let entry = slot.as_mut().expect("cached");
+        entry.fetched = Instant::now().checked_sub(by).expect("instant");
+    }
+
+    #[tokio::test]
+    async fn unknown_key_refresh_is_bounded_and_fails_closed() {
+        let idp = MockServer::start().await;
+        mount_discovery(&idp).await;
+        let issuer = Url::parse(&format!("{}/tenant", idp.uri())).expect("url");
+        let cache = MetadataCache::default();
+
+        cache.get(&issuer).await.expect("first discovery");
+        assert_eq!(discoveries(&idp).await, 1);
+        cache.refresh(&issuer).await.expect("too soon");
+        assert_eq!(discoveries(&idp).await, 1, "refresh is rate limited");
+
+        age(&cache, METADATA_MIN_REFRESH + Duration::from_secs(1)).await;
+        cache.refresh(&issuer).await.expect("refresh");
+        assert_eq!(
+            discoveries(&idp).await,
+            2,
+            "a stale enough entry is refetched"
+        );
+
+        idp.reset().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&idp)
+            .await;
+        age(&cache, METADATA_MIN_REFRESH + Duration::from_secs(1)).await;
+        assert!(
+            cache.refresh(&issuer).await.is_err(),
+            "a failed refresh is an error"
+        );
+        assert!(
+            cache.get(&issuer).await.is_ok(),
+            "the known-good document is kept after a failed refresh"
+        );
+    }
 
     fn req(enabled: bool, secret: Option<&str>) -> OidcSettingsUpdate {
         OidcSettingsUpdate {

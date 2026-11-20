@@ -48,8 +48,10 @@ pub async fn passthrough(
         path_and_query.push_str(q);
     }
 
+    // OPTIONS carries no API key, so it is answered here and never reaches
+    // PowerDNS with the SOAbox PowerDNS key.
     if method == Method::OPTIONS {
-        return forward_plain(&state, method, &path_and_query, &headers, body).await;
+        return crate::pdns::options::response(&segments, &state.config.pdns_server_id);
     }
 
     let presented = headers.get("x-api-key").and_then(|v| v.to_str().ok());

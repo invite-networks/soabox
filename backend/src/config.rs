@@ -106,15 +106,33 @@ pub enum ConfigError {
     },
 }
 
+/// Refuses a production configuration that came from a `.env` file.
+fn check_dotenv(mode: Mode, loaded_dotenv: bool) -> Result<(), ConfigError> {
+    if mode == Mode::Prod && loaded_dotenv {
+        return Err(ConfigError::Invalid {
+            name: "SOABOX_MODE",
+            reason: "prod mode cannot be configured from a .env file; set the variables in the \
+                     process environment instead"
+                .to_owned(),
+        });
+    }
+    Ok(())
+}
+
 impl Config {
     /// Loads configuration from the process environment. In `dev` setups a
     /// `.env` file in the working directory or its parent is loaded first.
+    ///
+    /// Production is never configured from a `.env` file: if one was loaded and
+    /// the resulting mode is `prod`, startup fails. Values passed by Compose
+    /// `env_file` are ordinary process environment and are not affected.
     pub fn from_env() -> Result<Self, ConfigError> {
-        if std::env::var("SOABOX_MODE").as_deref() != Ok("prod") {
-            let _ = dotenvy::dotenv();
-        }
+        let loaded_dotenv =
+            std::env::var("SOABOX_MODE").as_deref() != Ok("prod") && dotenvy::dotenv().is_ok();
         let vars: HashMap<String, String> = std::env::vars().collect();
-        Self::from_map(&vars)
+        let config = Self::from_map(&vars)?;
+        check_dotenv(config.mode, loaded_dotenv)?;
+        Ok(config)
     }
 
     /// Builds configuration from a map of variables. Used by tests.
@@ -135,7 +153,14 @@ impl Config {
         let oidc = match r.optional("SOABOX_OIDC_ISSUER") {
             None => None,
             Some(issuer) => Some(OidcConfig {
-                issuer: parse_url("SOABOX_OIDC_ISSUER", &issuer)?,
+                // The same rule as issuers saved in the UI: https, with http
+                // allowed only in dev mode for a local test provider.
+                issuer: crate::auth::provider::validate_issuer(&issuer, mode).map_err(
+                    |reason| ConfigError::Invalid {
+                        name: "SOABOX_OIDC_ISSUER",
+                        reason,
+                    },
+                )?,
                 client_id: r.required("SOABOX_OIDC_CLIENT_ID")?,
                 client_secret: Secret::new(r.secret_required("SOABOX_OIDC_CLIENT_SECRET")?),
                 button_label: r
@@ -401,6 +426,53 @@ mod tests {
         assert_eq!(c.trusted_proxies.len(), 2);
         v.insert("SOABOX_TRUSTED_PROXIES".into(), "nonsense".into());
         assert!(Config::from_map(&v).is_err());
+    }
+
+    #[test]
+    fn prod_is_never_configured_from_a_dotenv_file() {
+        assert!(matches!(
+            check_dotenv(Mode::Prod, true),
+            Err(ConfigError::Invalid {
+                name: "SOABOX_MODE",
+                ..
+            })
+        ));
+        assert!(check_dotenv(Mode::Prod, false).is_ok());
+        assert!(check_dotenv(Mode::Dev, true).is_ok());
+    }
+
+    #[test]
+    fn prod_requires_an_https_oidc_issuer() {
+        let mut v = base_vars();
+        v.insert("SOABOX_MODE".into(), "prod".into());
+        v.insert(
+            "SOABOX_PUBLIC_URL".into(),
+            "https://dns.example.test".into(),
+        );
+        v.insert(
+            "SOABOX_OIDC_ISSUER".into(),
+            "http://idp.example.test/v2.0".into(),
+        );
+        v.insert("SOABOX_OIDC_CLIENT_ID".into(), "client".into());
+        v.insert("SOABOX_OIDC_CLIENT_SECRET".into(), "secret".into());
+        assert!(matches!(
+            Config::from_map(&v),
+            Err(ConfigError::Invalid {
+                name: "SOABOX_OIDC_ISSUER",
+                ..
+            })
+        ));
+        v.insert(
+            "SOABOX_OIDC_ISSUER".into(),
+            "https://idp.example.test/v2.0".into(),
+        );
+        assert!(Config::from_map(&v).expect("https issuer").oidc.is_some());
+        v.insert("SOABOX_MODE".into(), "dev".into());
+        v.insert(
+            "SOABOX_OIDC_ISSUER".into(),
+            "http://localhost:28080/default".into(),
+        );
+        assert!(Config::from_map(&v).expect("http in dev").oidc.is_some());
     }
 
     #[test]

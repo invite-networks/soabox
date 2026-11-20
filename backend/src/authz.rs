@@ -98,6 +98,17 @@ impl Principal {
             }
         }
         let user_owned = owner.as_ref().is_some_and(|u| u.role == UserRole::User);
+        // A User-owned key may only create zones in an account its owner still
+        // belongs to. Membership is checked on every request so that removing
+        // the owner from the account revokes zone creation immediately.
+        let create_account_id = match (key.create_account_id, owner.as_ref()) {
+            (Some(account), Some(o)) if o.role == UserRole::User => store
+                .user_account_ids(o.id)
+                .await?
+                .contains(&account)
+                .then_some(account),
+            (account, _) => account,
+        };
         let name = if key.description.is_empty() {
             format!("api key {}", key.id)
         } else {
@@ -109,8 +120,8 @@ impl Principal {
             actor_name: name,
             level,
             zones,
-            create_account_id: key.create_account_id,
-            can_create: key.create_account_id.is_some()
+            create_account_id,
+            can_create: create_account_id.is_some()
                 && (!user_owned || settings.user_can_create_zones),
             can_delete_zones: !user_owned || settings.user_can_delete_zones,
             manage_dnssec: !user_owned || settings.user_can_manage_dnssec,

@@ -278,14 +278,18 @@ impl Store {
         )
     }
 
-    /// Records the last accepted TOTP step for a user.
-    pub async fn set_totp_last_step(&self, id: i64, step: i64) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE users SET totp_last_step = $1 WHERE id = $2")
-            .bind(step)
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
-        Ok(())
+    /// Consumes a TOTP time step for a user. Returns true only for the one
+    /// request that moves the last accepted step forward, so a code cannot be
+    /// used twice even by concurrent requests.
+    pub async fn consume_totp_step(&self, id: i64, step: i64) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE users SET totp_last_step = $1 WHERE id = $2 AND totp_last_step < $1",
+        )
+        .bind(step)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
     }
 
     /// Ends every session of a user except one.

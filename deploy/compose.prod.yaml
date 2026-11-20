@@ -5,8 +5,9 @@ name: soabox
 
 services:
   soabox:
-    # Pin the release digest, for example ghcr.io/invite-networks/soabox:0.2.0@sha256:...
-    image: ghcr.io/invite-networks/soabox:0.2.0
+    # Tracks the newest release. To hold a deployment on one release, use a
+    # version tag such as ghcr.io/invite-networks/soabox:0.2.1.
+    image: ghcr.io/invite-networks/soabox:latest
     env_file: .env
     environment:
       SOABOX_MODE: prod

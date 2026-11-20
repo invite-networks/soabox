@@ -80,7 +80,7 @@ Additional rules applied to writes on both `/api` and `/v1`, added after the pre
 
 ### 3.4 Key handling
 
-SOAbox always replaces the client's key ([ADR-0004](../adr/0004-api-key-swap.md)). See the [passthrough write sequence](../uml/sequence-passthrough-write.md).
+SOAbox always replaces the client's key ([ADR-0004](../adr/0004-api-key-swap.md)). `OPTIONS` requests carry no key and are answered by SOAbox with the headers PowerDNS returns for each route. They are never forwarded ([ADR-0016](../adr/0016-audit-hardening-2026-11.md)). A User-owned key may create zones only in an account its owner still belongs to, checked on every request. See the [passthrough write sequence](../uml/sequence-passthrough-write.md).
 
 - Keys are 32 random bytes from the OS CSPRNG, encoded base64url, with no recognizable prefix, so a key reveals nothing about SOAbox.
 - Storage is the SHA-256 digest of the key, indexed for lookup. Keys are high-entropy, so a fast hash is safe and keeps per-request cost low. Passwords, which are low-entropy, use argon2id.
@@ -124,7 +124,7 @@ Zone names are stored in PowerDNS canonical form with a trailing dot. SOAbox nev
 
 ## 5. Authentication Design
 
-- Local: argon2id password hashes, optional TOTP with secrets encrypted with XChaCha20-Poly1305 under `SOABOX_SECRET_KEY`, bound to their purpose as associated data. A TOTP code is accepted at most once (the last accepted time step is stored). Turning TOTP off needs the password and a code. Changing the password ends the user's other sessions. Password and code checks after sign-in are rate limited per account.
+- Local: argon2id password hashes, optional TOTP with secrets encrypted with XChaCha20-Poly1305 under `SOABOX_SECRET_KEY`, bound to their purpose as associated data. A TOTP code is accepted at most once: the time step is consumed with a conditional update, so concurrent requests cannot both use it. Wrong and replayed codes count against the per-client and the per-account sign-in limits. Turning TOTP off needs the password and a code. Changing the password ends the user's other sessions. Password and code checks after sign-in are rate limited per account.
 - OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. The provider settings come from `SOABOX_OIDC_*` when `SOABOX_OIDC_ISSUER` is set, and otherwise from the `oidc_provider` row an Admin edits in the UI ([ADR-0015](../adr/0015-oidc-settings-in-ui.md)). The row is read on each sign-in, so changes apply at once on every instance. The discovery document is cached in memory for the current issuer only, for at most one hour, and dropped when the settings are saved. For Entra, the issuer is the tenant-specific v2.0 endpoint. Users are matched on the `iss` and `sub` claims, which Entra keeps stable for a user within one app registration. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
 - Sessions: a random 32-byte id in the cookie, SHA-256 hashed in the database. `HttpOnly`, `Secure`, `SameSite=Lax`. Rotated on sign-in and role change. Idle and absolute timeouts from configuration.
 - CSRF: per-session token sent in a header on state-changing `/v1` calls.

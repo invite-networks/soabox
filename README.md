@@ -2,8 +2,6 @@
 
 SOAbox is a web interface and API gateway for [PowerDNS Authoritative Server](https://doc.powerdns.com/authoritative/) 5.x. It gives teams a clean UI for managing zones and records, and it gives automation a safer way to reach the PowerDNS API without changing a single line of client code.
 
-> **Status:** early development (v0.x). Not ready for production use yet. See the [roadmap](#roadmap).
-
 ## Why SOAbox
 
 PowerDNS is an excellent DNS server, but managing it day to day leaves gaps:
@@ -70,17 +68,6 @@ docker compose up --build
 ```
 
 Open http://localhost:8080 and sign in as the bootstrap Admin. See [getting started](docs/dev/getting-started.md) and the [install runbook](docs/runbooks/install.md).
-
-## Roadmap
-
-| Milestone | Scope | Status |
-|---|---|---|
-| 1 | [PowerDNS-compatible API with scoped keys and audit](docs/plans/milestone-1-passthrough.md) | Done |
-| 2 | [Users, sessions, local and OIDC sign-in](docs/plans/milestones-2-5-backend.md) | Done |
-| 3 | Web UI: zones and record editor | Done |
-| 4 | Administration: users, accounts, keys, templates, history | Done |
-| 5 | DNSSEC, metadata, TSIG, server views | Done |
-| 6 | Hardening and first release | Done. v0.1.0 released 2026-11-19 |
 
 ## Documentation
 
