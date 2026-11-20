@@ -7,7 +7,7 @@
 ## Upgrade
 
 1. Take a backup per [Backup and recovery](recovery.md).
-2. Change the image tag or digest in `compose.yaml`.
+2. Images are published to `ghcr.io/invite-networks/soabox` as `X.Y.Z`, `X.Y`, and `latest` (see [Releasing](../dev/releasing.md)). If `compose.yaml` uses `latest`, pulling picks up the new release. To hold a deployment on one release, set the version tag, for example `ghcr.io/invite-networks/soabox:0.2.1`.
 3. `docker compose pull soabox && docker compose up -d soabox`
 4. Migrations run automatically at startup. Watch `docker compose logs -f soabox` for `migrations complete`.
 
