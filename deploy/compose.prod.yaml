@@ -5,7 +5,8 @@ name: soabox
 
 services:
   soabox:
-    image: ghcr.io/invite-networks/soabox:latest   # pin a digest in production
+    # Pin the release digest, for example ghcr.io/invite-networks/soabox:0.1.0@sha256:...
+    image: ghcr.io/invite-networks/soabox:0.1.0
     env_file: .env
     environment:
       SOABOX_MODE: prod
@@ -14,7 +15,9 @@ services:
     volumes:
       - ./data/soabox:/app/data
     ports:
-      - "8080:8080"
+      # Published on localhost for a reverse proxy on the same host. Use an
+      # internal network instead if the proxy runs elsewhere.
+      - "127.0.0.1:8080:8080"
     read_only: true
     depends_on:
       - postgres
@@ -22,7 +25,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:18
+    image: postgres:18   # pin a digest in production
     environment:
       POSTGRES_USER: soabox
       POSTGRES_DB: soabox

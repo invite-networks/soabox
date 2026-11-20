@@ -45,7 +45,7 @@ type TotpForm = z.infer<typeof totpSchema>;
 
 /** Only follow same-site relative redirects. */
 function safeRedirect(target: string | undefined): string {
-  if (!target?.startsWith("/") || target.startsWith("//") || target.startsWith("/login")) {
+  if (!target?.startsWith("/") || target.startsWith("//") || target.includes("\\") || target.startsWith("/login")) {
     return "/";
   }
   return target;

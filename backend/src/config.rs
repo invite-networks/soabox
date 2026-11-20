@@ -110,7 +110,9 @@ impl Config {
     /// Loads configuration from the process environment. In `dev` setups a
     /// `.env` file in the working directory or its parent is loaded first.
     pub fn from_env() -> Result<Self, ConfigError> {
-        let _ = dotenvy::dotenv();
+        if std::env::var("SOABOX_MODE").as_deref() != Ok("prod") {
+            let _ = dotenvy::dotenv();
+        }
         let vars: HashMap<String, String> = std::env::vars().collect();
         Self::from_map(&vars)
     }
@@ -164,6 +166,14 @@ impl Config {
             .optional("SOABOX_PDNS_SERVER_ID")
             .unwrap_or_else(|| "localhost".to_owned());
 
+        let public_url = parse_url("SOABOX_PUBLIC_URL", &r.required("SOABOX_PUBLIC_URL")?)?;
+        if mode == Mode::Prod && public_url.scheme() != "https" {
+            return Err(ConfigError::Invalid {
+                name: "SOABOX_PUBLIC_URL",
+                reason: "must use https in prod mode so cookies are Secure".to_owned(),
+            });
+        }
+
         let default_level = match mode {
             Mode::Dev => "debug",
             Mode::Prod => "info",
@@ -173,7 +183,7 @@ impl Config {
             mode,
             environment: r.optional("SOABOX_ENVIRONMENT"),
             bind: r.parsed("SOABOX_BIND", "0.0.0.0:8080")?,
-            public_url: parse_url("SOABOX_PUBLIC_URL", &r.required("SOABOX_PUBLIC_URL")?)?,
+            public_url,
             database_url: Secret::new(
                 r.secret_optional("SOABOX_DATABASE_URL")?
                     .unwrap_or_else(|| "sqlite://data/soabox.db".to_owned()),
@@ -288,10 +298,18 @@ fn parse_key(name: &'static str, raw: &str) -> Result<[u8; 32], ConfigError> {
             name,
             reason: format!("not base64: {e}"),
         })?;
-    bytes.try_into().map_err(|_| ConfigError::Invalid {
+    let key: [u8; 32] = bytes.try_into().map_err(|_| ConfigError::Invalid {
         name,
         reason: "must decode to exactly 32 bytes (openssl rand -base64 32)".to_owned(),
-    })
+    })?;
+    let distinct: std::collections::BTreeSet<u8> = key.iter().copied().collect();
+    if distinct.len() < 8 {
+        return Err(ConfigError::Invalid {
+            name,
+            reason: "is not random enough, generate one with openssl rand -base64 32".to_owned(),
+        });
+    }
+    Ok(key)
 }
 
 #[cfg(test)]
@@ -306,7 +324,7 @@ mod tests {
             ("SOABOX_PDNS_API_KEY", "upstream"),
             (
                 "SOABOX_SECRET_KEY",
-                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
             ),
         ]
         .into_iter()
@@ -403,6 +421,25 @@ mod tests {
             format!("{:?}", c.oidc.expect("oidc").client_secret),
             "[redacted]"
         );
+    }
+
+    #[test]
+    fn prod_requires_https_and_random_key() {
+        let mut v = base_vars();
+        v.insert("SOABOX_PUBLIC_URL".into(), "http://dns.example.test".into());
+        assert!(Config::from_map(&v).is_err());
+        let mut v = base_vars();
+        v.insert(
+            "SOABOX_SECRET_KEY".into(),
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into(),
+        );
+        assert!(matches!(
+            Config::from_map(&v),
+            Err(ConfigError::Invalid {
+                name: "SOABOX_SECRET_KEY",
+                ..
+            })
+        ));
     }
 
     #[test]

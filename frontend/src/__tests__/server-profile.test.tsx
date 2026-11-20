@@ -100,13 +100,22 @@ describe("profile", () => {
   it("disables TOTP and hides password sections for single sign-on users", async () => {
     server.use(
       http.get("/v1/me", () => json({ ...adminMe, user: { ...adminMe.user, totp_enabled: true } })),
-      http.delete("/v1/me/totp", () => apiError(422, "VALIDATION_ERROR", "Wrong code")),
+      http.delete("/v1/me/totp", async ({ request }) => {
+        sent = await request.json();
+        return apiError(422, "VALIDATION_ERROR", "Wrong code");
+      }),
     );
+    let sent: unknown;
     const { user, unmount } = renderApp("/profile");
     await findHeading("Profile");
-    await user.type(screen.getByLabelText("Current code"), "654321");
-    await user.click(screen.getByRole("button", { name: "Turn off two-factor" }));
+    const form = screen.getByRole("form", { name: "Turn off two-factor authentication" });
+    await user.type(within(form).getByLabelText("Current code"), "654321");
+    await user.click(within(form).getByRole("button", { name: "Turn off two-factor" }));
+    expect(await within(form).findByText("Enter your current password.")).toBeInTheDocument();
+    await user.type(within(form).getByLabelText("Current password"), "pw-123456789");
+    await user.click(within(form).getByRole("button", { name: "Turn off two-factor" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Wrong code");
+    expect(sent).toEqual({ code: "654321", password: "pw-123456789" });
     unmount();
 
     renderApp("/profile", { me: { ...adminMe, user: { ...adminMe.user, auth_source: "oidc" } } });

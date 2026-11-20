@@ -574,7 +574,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TotpCode"
+                "$ref": "#/components/schemas/TotpDisable"
               }
             }
           },
@@ -2784,6 +2784,22 @@
         ],
         "properties": {
           "code": {
+            "type": "string"
+          }
+        }
+      },
+      "TotpDisable": {
+        "type": "object",
+        "description": "A TOTP code and the current password, to turn two-factor sign-in off.",
+        "required": [
+          "code",
+          "password"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "password": {
             "type": "string"
           }
         }

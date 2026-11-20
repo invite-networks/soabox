@@ -179,6 +179,12 @@ async fn serve(config: Config) -> anyhow::Result<()> {
     let bind = config.bind;
     let state = AppState::new(config).await?;
     crate::auth::bootstrap_admin(&state).await?;
+    if state.config.mode == crate::config::Mode::Prod && state.config.trusted_proxies.is_empty() {
+        tracing::warn!(
+            "SOABOX_TRUSTED_PROXIES is empty: behind a reverse proxy every client shares the \
+             proxy address, so rate limits and audit client addresses apply to all clients together"
+        );
+    }
     spawn_session_cleanup(state.clone());
     let app = crate::app::router(state);
     let listener = tokio::net::TcpListener::bind(bind)
@@ -238,9 +244,13 @@ pub async fn rotate_secrets(state: &AppState) -> anyhow::Result<usize> {
     let keys = state.secret_keys();
     let mut n = 0;
     for (id, enc) in state.store.users_with_totp().await? {
-        let plain = crate::auth::crypto::decrypt(&keys, &enc)
+        let plain = crate::auth::crypto::decrypt(crate::auth::crypto::PURPOSE_TOTP, &keys, &enc)
             .with_context(|| format!("user {id}: secret cannot be decrypted with either key"))?;
-        let fresh = crate::auth::crypto::encrypt(&state.config.secret_key, &plain)?;
+        let fresh = crate::auth::crypto::encrypt(
+            crate::auth::crypto::PURPOSE_TOTP,
+            &state.config.secret_key,
+            &plain,
+        )?;
         let enabled = state
             .store
             .get_user(id)

@@ -37,20 +37,67 @@ pub struct Principal {
     pub can_create: bool,
     /// Whether a limited principal may delete zones in scope.
     pub can_delete_zones: bool,
+    /// Whether DNSSEC keys, DNSSEC zone flags, and metadata may be changed.
+    pub manage_dnssec: bool,
+    /// Record types allowed in forward and reverse zones. `None` means no
+    /// list applies (Admins, Operators, and keys issued by them).
+    pub allowed_types: Option<(Vec<String>, Vec<String>)>,
+    /// Whether secondary zones and their primaries may be set. Primaries make
+    /// PowerDNS connect to other hosts, so this is staff only.
+    pub manage_secondaries: bool,
+}
+
+fn level_of_role(role: UserRole) -> Level {
+    match role {
+        UserRole::Admin => Level::Admin,
+        UserRole::Operator => Level::Operator,
+        UserRole::User => Level::Limited,
+    }
+}
+
+fn rank(l: Level) -> u8 {
+    match l {
+        Level::Admin => 2,
+        Level::Operator => 1,
+        Level::Limited => 0,
+    }
 }
 
 impl Principal {
-    /// Builds the principal for an API key, resolving account scope.
-    pub async fn for_api_key(store: &Store, key: &ApiKeyRecord) -> Result<Self, sqlx::Error> {
-        let level = match key.role {
+    /// Builds the principal for an API key. A key never exceeds its owner:
+    /// its level is capped at the owner's current role, and a key owned by a
+    /// User is limited to the owner's current zones and follows the User
+    /// policy settings.
+    pub async fn for_api_key(
+        store: &Store,
+        key: &ApiKeyRecord,
+        settings: &Settings,
+    ) -> Result<Self, sqlx::Error> {
+        let key_level = match key.role {
             Role::Admin => Level::Admin,
             Role::Operator => Level::Operator,
             Role::Scoped => Level::Limited,
         };
-        let mut zones: HashSet<String> = key.zones.iter().cloned().collect();
+        let owner = match key.owner_user_id {
+            Some(uid) => store.get_user(uid).await?,
+            None => None,
+        };
+        let owner_level = owner.as_ref().map(|u| level_of_role(u.role));
+        let level = match owner_level {
+            Some(o) if rank(o) < rank(key_level) => o,
+            _ => key_level,
+        };
+        let mut zones: HashSet<String> = HashSet::new();
         if level == Level::Limited {
+            zones.extend(key.zones.iter().cloned());
             zones.extend(store.zones_for_accounts(&key.account_ids).await?);
+            if let Some(o) = owner.as_ref().filter(|u| u.role == UserRole::User) {
+                let allowed: HashSet<String> =
+                    store.user_access_zones(o.id).await?.into_iter().collect();
+                zones.retain(|z| allowed.contains(z));
+            }
         }
+        let user_owned = owner.as_ref().is_some_and(|u| u.role == UserRole::User);
         let name = if key.description.is_empty() {
             format!("api key {}", key.id)
         } else {
@@ -63,8 +110,17 @@ impl Principal {
             level,
             zones,
             create_account_id: key.create_account_id,
-            can_create: key.create_account_id.is_some(),
-            can_delete_zones: true,
+            can_create: key.create_account_id.is_some()
+                && (!user_owned || settings.user_can_create_zones),
+            can_delete_zones: !user_owned || settings.user_can_delete_zones,
+            manage_dnssec: !user_owned || settings.user_can_manage_dnssec,
+            allowed_types: user_owned.then(|| {
+                (
+                    settings.record_types_forward.clone(),
+                    settings.record_types_reverse.clone(),
+                )
+            }),
+            manage_secondaries: level != Level::Limited,
         })
     }
 
@@ -74,11 +130,7 @@ impl Principal {
         user: &User,
         settings: &Settings,
     ) -> Result<Self, sqlx::Error> {
-        let level = match user.role {
-            UserRole::Admin => Level::Admin,
-            UserRole::Operator => Level::Operator,
-            UserRole::User => Level::Limited,
-        };
+        let level = level_of_role(user.role);
         let zones = if level == Level::Limited {
             store
                 .user_access_zones(user.id)
@@ -88,6 +140,7 @@ impl Principal {
         } else {
             HashSet::new()
         };
+        let staff = level != Level::Limited;
         Ok(Self {
             actor_type: "user",
             actor_id: user.id,
@@ -97,6 +150,12 @@ impl Principal {
             create_account_id: None,
             can_create: settings.user_can_create_zones,
             can_delete_zones: settings.user_can_delete_zones,
+            manage_dnssec: staff || settings.user_can_manage_dnssec,
+            allowed_types: Some((
+                settings.record_types_forward.clone(),
+                settings.record_types_reverse.clone(),
+            )),
+            manage_secondaries: staff,
         })
     }
 
@@ -114,6 +173,98 @@ impl Principal {
     pub fn can_create_zones(&self) -> bool {
         self.all_zones() || self.can_create
     }
+
+    /// Checks a record type for a zone. `Err` carries the reason.
+    pub fn check_record_type(&self, zone: &ZoneName, rtype: &str) -> Result<(), String> {
+        let t = rtype.to_ascii_uppercase();
+        match &self.allowed_types {
+            Some((forward, reverse)) => {
+                let list = if is_reverse_zone(zone) {
+                    reverse
+                } else {
+                    forward
+                };
+                if list.contains(&t) {
+                    Ok(())
+                } else {
+                    Err(format!("record type {t} is not allowed in this zone"))
+                }
+            }
+            None if t == "LUA" && self.level != Level::Admin => {
+                Err("LUA records are reserved for Admins".to_owned())
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Checks whether this principal may write a zone metadata kind.
+    pub fn check_metadata_kind(&self, kind: &str) -> Result<(), String> {
+        if !self.manage_dnssec {
+            return Err("you may not change zone metadata".to_owned());
+        }
+        if self.level == Level::Admin || SAFE_METADATA.contains(&kind.to_ascii_uppercase().as_str())
+        {
+            Ok(())
+        } else {
+            Err(format!("metadata kind {kind} is reserved for Admins"))
+        }
+    }
+
+    /// For limited principals, refuses a new zone that is equal to, above,
+    /// or below a zone outside their scope.
+    pub fn check_new_zone(&self, new: &ZoneName, existing: &[ZoneName]) -> Result<(), String> {
+        if self.all_zones() {
+            return Ok(());
+        }
+        let clash = existing.iter().find(|z| {
+            !self.can_access_zone(z)
+                && (z.contains_name(new.as_str()) || new.contains_name(z.as_str()))
+        });
+        match clash {
+            Some(z) => Err(format!("{new} overlaps {z}, which you do not manage")),
+            None => Ok(()),
+        }
+    }
+}
+
+/// Metadata kinds non-Admins may set. Kinds that run code, make PowerDNS
+/// contact other hosts, or forward updates are Admin only.
+pub const SAFE_METADATA: &[&str] = &[
+    "ALLOW-AXFR-FROM",
+    "ALLOW-DNSUPDATE-FROM",
+    "API-RECTIFY",
+    "AXFR-MASTER-TSIG",
+    "IXFR",
+    "NOTIFY-DNSUPDATE",
+    "NSEC3NARROW",
+    "NSEC3PARAM",
+    "PUBLISH-CDNSKEY",
+    "PUBLISH-CDS",
+    "SLAVE-RENOTIFY",
+    "SOA-EDIT",
+    "SOA-EDIT-API",
+    "SOA-EDIT-DNSUPDATE",
+    "TSIG-ALLOW-AXFR",
+    "TSIG-ALLOW-DNSUPDATE",
+];
+
+/// True for in-addr.arpa and ip6.arpa zones.
+pub fn is_reverse_zone(zone: &ZoneName) -> bool {
+    zone.as_str().ends_with(".in-addr.arpa.") || zone.as_str().ends_with(".ip6.arpa.")
+}
+
+/// True when a zone kind or primaries list makes it a secondary zone.
+pub fn is_secondary_request(body: &serde_json::Value) -> bool {
+    let kind = body
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let has_primaries = body
+        .get("masters")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|m| !m.is_empty());
+    kind == "slave" || kind == "secondary" || kind == "consumer" || has_primaries
 }
 
 /// What a `/api` request is.
@@ -256,6 +407,9 @@ mod tests {
             create_account_id: create.then_some(1),
             can_create: create,
             can_delete_zones: true,
+            manage_dnssec: true,
+            allowed_types: None,
+            manage_secondaries: level != Level::Limited,
         }
     }
 
@@ -463,5 +617,94 @@ mod tests {
             "v1/servers/localhost/zones/a.test./metadata/X",
         );
         assert_eq!(decide(&p, &Method::DELETE, &del_meta), Decision::Allow);
+    }
+}
+
+#[cfg(test)]
+mod policy_tests {
+    use super::*;
+
+    fn p(level: Level) -> Principal {
+        Principal {
+            actor_type: "user",
+            actor_id: 1,
+            actor_name: "u".into(),
+            level,
+            zones: ["a.test.".to_owned()].into_iter().collect(),
+            create_account_id: None,
+            can_create: true,
+            can_delete_zones: true,
+            manage_dnssec: true,
+            allowed_types: None,
+            manage_secondaries: level != Level::Limited,
+        }
+    }
+
+    fn z(n: &str) -> ZoneName {
+        ZoneName::from_name(n).expect("zone")
+    }
+
+    #[test]
+    fn metadata_allowlist() {
+        let admin = p(Level::Admin);
+        let op = p(Level::Operator);
+        assert!(admin.check_metadata_kind("LUA-AXFR-SCRIPT").is_ok());
+        assert!(op.check_metadata_kind("LUA-AXFR-SCRIPT").is_err());
+        assert!(op.check_metadata_kind("ALSO-NOTIFY").is_err());
+        assert!(op.check_metadata_kind("allow-axfr-from").is_ok());
+        let mut limited = p(Level::Limited);
+        limited.manage_dnssec = false;
+        assert!(limited.check_metadata_kind("SOA-EDIT-API").is_err());
+    }
+
+    #[test]
+    fn record_types() {
+        let mut u = p(Level::Limited);
+        assert!(u.check_record_type(&z("a.test"), "LUA").is_err());
+        assert!(
+            p(Level::Admin)
+                .check_record_type(&z("a.test"), "LUA")
+                .is_ok()
+        );
+        u.allowed_types = Some((vec!["A".into()], vec!["PTR".into()]));
+        assert!(u.check_record_type(&z("a.test"), "a").is_ok());
+        assert!(u.check_record_type(&z("a.test"), "MX").is_err());
+        assert!(
+            u.check_record_type(&z("2.0.192.in-addr.arpa"), "PTR")
+                .is_ok()
+        );
+        assert!(
+            u.check_record_type(&z("2.0.192.in-addr.arpa"), "A")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn new_zone_overlap() {
+        let u = p(Level::Limited);
+        let existing = vec![z("a.test"), z("victim.test")];
+        assert!(u.check_new_zone(&z("sub.a.test"), &existing).is_ok());
+        assert!(
+            u.check_new_zone(&z("login.victim.test"), &existing)
+                .is_err()
+        );
+        assert!(u.check_new_zone(&z("test"), &existing).is_err());
+        assert!(u.check_new_zone(&z("other.test"), &existing).is_ok());
+        assert!(
+            p(Level::Operator)
+                .check_new_zone(&z("login.victim.test"), &existing)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn secondary_detection() {
+        assert!(is_secondary_request(&serde_json::json!({"kind": "Slave"})));
+        assert!(is_secondary_request(
+            &serde_json::json!({"kind": "Native", "masters": ["192.0.2.1"]})
+        ));
+        assert!(!is_secondary_request(
+            &serde_json::json!({"kind": "Native", "masters": []})
+        ));
     }
 }

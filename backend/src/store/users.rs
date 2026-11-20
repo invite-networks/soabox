@@ -62,6 +62,8 @@ pub struct User {
     pub auth_source: String,
     pub status: UserStatus,
     pub totp_enabled: bool,
+    #[serde(skip)]
+    pub totp_last_step: i64,
     pub created_at: i64,
     pub last_login_at: Option<i64>,
     #[serde(skip)]
@@ -108,7 +110,7 @@ pub struct SessionRecord {
 
 const USER_COLUMNS: &str = "u.id, u.username, u.display_name, u.email, u.role, u.auth_source, \
      u.oidc_issuer, u.oidc_subject, u.password_hash, u.totp_secret_enc, u.totp_enabled, \
-     u.status, u.created_at, u.last_login_at";
+     u.totp_last_step, u.status, u.created_at, u.last_login_at";
 
 fn user_from_row(r: &AnyRow) -> Result<User, sqlx::Error> {
     let decode = |e: String| sqlx::Error::Decode(e.into());
@@ -124,6 +126,7 @@ fn user_from_row(r: &AnyRow) -> Result<User, sqlx::Error> {
         password_hash: r.try_get("password_hash")?,
         totp_secret_enc: r.try_get("totp_secret_enc")?,
         totp_enabled: r.try_get::<i64, _>("totp_enabled")? != 0,
+        totp_last_step: r.try_get("totp_last_step")?,
         status: r.try_get::<String, _>("status")?.parse().map_err(decode)?,
         created_at: r.try_get("created_at")?,
         last_login_at: r.try_get("last_login_at")?,
@@ -272,6 +275,32 @@ impl Store {
                 .await?
                 .rows_affected()
                 > 0,
+        )
+    }
+
+    /// Records the last accepted TOTP step for a user.
+    pub async fn set_totp_last_step(&self, id: i64, step: i64) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE users SET totp_last_step = $1 WHERE id = $2")
+            .bind(step)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Ends every session of a user except one.
+    pub async fn delete_other_sessions(
+        &self,
+        user_id: i64,
+        keep: &str,
+    ) -> Result<u64, sqlx::Error> {
+        Ok(
+            sqlx::query("DELETE FROM sessions WHERE user_id = $1 AND id_hash <> $2")
+                .bind(user_id)
+                .bind(keep)
+                .execute(&self.pool)
+                .await?
+                .rows_affected(),
         )
     }
 

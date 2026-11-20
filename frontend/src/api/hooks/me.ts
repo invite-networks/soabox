@@ -91,7 +91,7 @@ export function useTotpEnable() {
 export function useTotpDisable() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (code: string) => api.delete<void>("/v1/me/totp", { code }),
+    mutationFn: (input: { code: string; password: string }) => api.delete<void>("/v1/me/totp", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: meKeys.me }),
   });
 }

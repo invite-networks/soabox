@@ -28,7 +28,7 @@ pub fn config_vars(pdns_url: &str) -> HashMap<String, String> {
         ("SOABOX_PDNS_TIMEOUT_SECS", "2"),
         (
             "SOABOX_SECRET_KEY",
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
         ),
     ]
     .into_iter()

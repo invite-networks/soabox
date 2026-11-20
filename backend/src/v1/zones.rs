@@ -239,6 +239,23 @@ pub async fn create(
             ));
         }
     };
+    let secondary = matches!(kind.as_str(), "Slave" | "Secondary") || !req.masters.is_empty();
+    if secondary && !p.manage_secondaries {
+        return Err(ApiError::Forbidden(
+            "only Admins and Operators can create secondary zones".into(),
+        ));
+    }
+    if !p.all_zones() {
+        let existing: Vec<ZoneName> = state
+            .pdns
+            .list_zones()
+            .await?
+            .iter()
+            .filter_map(|z| ZoneName::from_url_id(&z.id).map(|(n, _)| n))
+            .collect();
+        p.check_new_zone(&zone, &existing)
+            .map_err(ApiError::Forbidden)?;
+    }
     let account = match req.account_id {
         None => None,
         Some(aid) => {
@@ -296,6 +313,7 @@ pub async fn create(
                 .clone()
                 .and_then(|v| serde_json::from_value(v).ok())
                 .ok_or_else(|| ApiError::internal(anyhow::anyhow!("PowerDNS returned no zone")))?;
+            state.store.forget_zone(zone.as_str()).await?;
             if let Some(a) = &account {
                 state.store.set_zone_account(zone.as_str(), a.id).await?;
             } else if !p.all_zones() {
@@ -362,6 +380,15 @@ pub async fn update(
 ) -> Result<StatusCode, ApiError> {
     let p = auth.principal(&state).await?;
     let zone = zone_in_scope(&p, &id)?;
+    let to_secondary = req
+        .kind
+        .as_deref()
+        .is_some_and(|k| matches!(k, "Slave" | "Secondary" | "Consumer"));
+    if (to_secondary || req.masters.is_some()) && !p.manage_secondaries {
+        return Err(ApiError::Forbidden(
+            "only Admins and Operators can change primaries or make a zone secondary".into(),
+        ));
+    }
     let mut body = serde_json::Map::new();
     if let Some(k) = &req.kind {
         body.insert("kind".into(), json!(k));
@@ -1091,6 +1118,7 @@ pub async fn put_metadata(
 ) -> Result<StatusCode, ApiError> {
     let (p, zone) = dnssec_scope(&state, &auth, &id).await?;
     valid_kind(&kind)?;
+    p.check_metadata_kind(&kind).map_err(ApiError::Forbidden)?;
     let body = json!({"kind": kind, "metadata": req.metadata});
     let result = state
         .pdns
@@ -1125,6 +1153,7 @@ pub async fn delete_metadata(
 ) -> Result<StatusCode, ApiError> {
     let (p, zone) = dnssec_scope(&state, &auth, &id).await?;
     valid_kind(&kind)?;
+    p.check_metadata_kind(&kind).map_err(ApiError::Forbidden)?;
     let result = state
         .pdns
         .send(

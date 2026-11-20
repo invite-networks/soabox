@@ -222,7 +222,7 @@ describe("TSIG keys", () => {
 
     await user.click(screen.getByRole("button", { name: "View transfer" }));
     let view = await screen.findByRole("dialog", { name: "TSIG key" });
-    expect(await within(view).findByLabelText("Secret")).toHaveTextContent("c2VjcmV0LWtleQ==");
+    expect(await within(view).findByLabelText("Secret")).toHaveTextContent(btoa("secret-key"));
     await user.click(within(view).getByRole("button", { name: "Close" }));
 
     await user.click(screen.getByRole("button", { name: "Create TSIG key" }));

@@ -81,6 +81,9 @@ impl Store {
 
         let store = Self { pool, backend };
         store.migrate().await?;
+        if backend == Backend::Sqlite {
+            restrict_sqlite_files(&url);
+        }
         Ok(store)
     }
 
@@ -132,7 +135,39 @@ impl Store {
         sqlx::query(sqlx::AssertSqlSafe(format!("VACUUM INTO '{dest}'")))
             .execute(&self.pool)
             .await?;
+        set_private(std::path::Path::new(dest));
         Ok(())
+    }
+}
+
+/// Owner-only permissions on a file. Best effort, Unix only.
+fn set_private(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+            tracing::warn!(path = %path.display(), error = %e, "could not restrict file permissions");
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+}
+
+fn restrict_sqlite_files(url: &str) {
+    let path = url
+        .trim_start_matches("sqlite://")
+        .trim_start_matches("sqlite:")
+        .split('?')
+        .next()
+        .unwrap_or_default();
+    if path.is_empty() || path == ":memory:" {
+        return;
+    }
+    for suffix in ["", "-wal", "-shm"] {
+        let p = std::path::PathBuf::from(format!("{path}{suffix}"));
+        if p.exists() {
+            set_private(&p);
+        }
     }
 }
 
@@ -195,5 +230,11 @@ mod tests {
             .await
             .expect("backup");
         assert!(dest.exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&dest).expect("meta").permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
     }
 }
