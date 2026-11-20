@@ -31,15 +31,17 @@ import {
   Th,
   Tr,
 } from "../../components/ui";
-import { DEFAULT_FORWARD_TYPES, normalizeContent, validateContent } from "../../lib/dns";
+import { RecordValueFields } from "../../components/zone/record-value-fields";
+import { KNOWN_RECORD_TYPES } from "../../lib/dns";
 import { useMe } from "../../lib/me-context";
 import { can } from "../../lib/permissions";
+import { emptyRow, type RowValue, rowContent, rowErrors, rowFromContent } from "../../lib/record-rows";
 
 export const Route = createFileRoute("/_app/templates")({
   component: TemplatesPage,
 });
 
-const TYPES = [...new Set([...DEFAULT_FORWARD_TYPES, "PTR", "SOA"])].sort();
+const TYPES = [...new Set([...KNOWN_RECORD_TYPES, "SOA"])].sort();
 
 const schema = z
   .object({
@@ -52,17 +54,21 @@ const schema = z
           .trim()
           .regex(/^(@|[A-Za-z0-9_*-]+(\.[A-Za-z0-9_-]+)*)$/, "Use @ or a relative name such as www."),
         type: z.string(),
-        ttl: z.string().regex(/^\d+$/, "Seconds"),
-        content: z.string(),
+        ttl: z.string().regex(/^\d+$/, "Enter a whole number of seconds."),
+        values: z.array(z.string()),
+        initial: z.array(z.string()).nullable(),
+        original: z.string().nullable(),
+        raw: z.boolean(),
       }),
     ),
   })
   .superRefine((values, ctx) => {
     values.records.forEach((r, i) => {
-      const message = validateContent(r.type, r.content);
-      if (message) {
-        ctx.addIssue({ code: "custom", path: ["records", i, "content"], message });
-      }
+      rowErrors(r.type, r as RowValue, null).forEach((message, j) => {
+        if (message) {
+          ctx.addIssue({ code: "custom", path: ["records", i, "values", j], message });
+        }
+      });
     });
   });
 type Values = z.infer<typeof schema>;
@@ -71,7 +77,12 @@ function toValues(t: Template | null): Values {
   return {
     name: t?.name ?? "",
     description: t?.description ?? "",
-    records: (t?.records ?? []).map((r) => ({ name: r.name, type: r.type, ttl: String(r.ttl), content: r.content })),
+    records: (t?.records ?? []).map((r) => ({
+      name: r.name,
+      type: r.type,
+      ttl: String(r.ttl),
+      ...rowFromContent(r.type, r.content, null),
+    })),
   };
 }
 
@@ -106,7 +117,7 @@ function TemplateDialog({
             name: r.name,
             type: r.type,
             ttl: Number(r.ttl),
-            content: normalizeContent(r.type, r.content),
+            content: rowContent(r.type, r as RowValue, null),
           })),
         },
       },
@@ -144,87 +155,109 @@ function TemplateDialog({
             render={({ field }) => <TextField label="Description" value={field.value} onChange={field.onChange} />}
           />
         </FieldGrid>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium text-fg">Records</legend>
-          <p className="text-xs text-fg-muted">Names are relative to the zone. Use @ for the zone itself.</p>
-          {records.fields.map((item, index) => (
-            <div key={item.id} className="grid grid-cols-[1fr_7rem_6rem_2fr_auto] items-start gap-2">
-              <Controller
-                control={form.control}
-                name={`records.${index}.name`}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    label={`Record ${index + 1} name`}
-                    hideLabel
-                    placeholder="@"
-                    value={field.value}
-                    onChange={field.onChange}
-                    inputRef={field.ref}
-                    errorMessage={fieldState.error?.message}
-                    mono
-                  />
-                )}
-              />
-              <Controller
-                control={form.control}
-                name={`records.${index}.type`}
-                render={({ field }) => (
-                  <SelectField
-                    label={`Record ${index + 1} type`}
-                    hideLabel
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={TYPES.map((t) => ({ id: t, label: t }))}
-                  />
-                )}
-              />
-              <Controller
-                control={form.control}
-                name={`records.${index}.ttl`}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    label={`Record ${index + 1} TTL`}
-                    hideLabel
-                    value={field.value}
-                    onChange={field.onChange}
-                    inputRef={field.ref}
-                    errorMessage={fieldState.error?.message}
-                    mono
-                  />
-                )}
-              />
-              <Controller
-                control={form.control}
-                name={`records.${index}.content`}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    label={`Record ${index + 1} content`}
-                    hideLabel
-                    value={field.value}
-                    onChange={field.onChange}
-                    inputRef={field.ref}
-                    errorMessage={fieldState.error?.message}
-                    mono
-                  />
-                )}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Remove record ${index + 1}`}
-                onPress={() => records.remove(index)}
-              >
-                <Trash2 aria-hidden />
-              </Button>
-            </div>
-          ))}
+        <div className="flex flex-col gap-3">
           <div>
-            <Button size="sm" onPress={() => records.append({ name: "@", type: "A", ttl: "3600", content: "" })}>
+            <h3 className="text-sm font-medium text-fg">Records</h3>
+            <p className="text-xs text-fg-muted">
+              Names and host values are relative to the new zone unless they end with a dot. Use @ for the zone itself.
+            </p>
+          </div>
+          {records.fields.length === 0 && <p className="text-sm text-fg-muted">No records yet.</p>}
+          {records.fields.map((item, index) => {
+            const rowType = form.watch(`records.${index}.type`);
+            const errors = form.formState.errors.records?.[index];
+            return (
+              <fieldset key={item.id} className="relative flex flex-col gap-3 rounded-lg border border-border p-3">
+                <legend className="float-left w-full pt-1 text-xs font-semibold tracking-wider text-fg-muted uppercase">
+                  Record {index + 1}
+                </legend>
+                <div className="absolute top-2 right-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove record ${index + 1}`}
+                    onPress={() => records.remove(index)}
+                  >
+                    <Trash2 aria-hidden />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_8rem]">
+                  <Controller
+                    control={form.control}
+                    name={`records.${index}.name`}
+                    render={({ field, fieldState }) => (
+                      <TextField
+                        label="Name"
+                        placeholder="@"
+                        value={field.value}
+                        onChange={field.onChange}
+                        inputRef={field.ref}
+                        errorMessage={fieldState.error?.message}
+                        mono
+                        autoComplete="off"
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name={`records.${index}.type`}
+                    render={({ field }) => (
+                      <SelectField
+                        label="Type"
+                        value={field.value}
+                        onChange={(value) => {
+                          field.onChange(value);
+                          form.setValue(`records.${index}`, {
+                            ...form.getValues(`records.${index}`),
+                            type: value,
+                            ...emptyRow(value),
+                          });
+                        }}
+                        options={TYPES.map((t) => ({ id: t, label: t }))}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name={`records.${index}.ttl`}
+                    render={({ field, fieldState }) => (
+                      <TextField
+                        label="TTL (seconds)"
+                        inputMode="numeric"
+                        value={field.value}
+                        onChange={(value) => field.onChange(value.replace(/\D/g, ""))}
+                        inputRef={field.ref}
+                        errorMessage={fieldState.error?.message}
+                        mono
+                      />
+                    )}
+                  />
+                </div>
+                <Controller
+                  control={form.control}
+                  name={`records.${index}.values`}
+                  render={({ field }) => (
+                    <RecordValueFields
+                      type={rowType}
+                      values={field.value}
+                      onChange={field.onChange}
+                      errors={(errors?.values as { message?: string }[] | undefined)?.map((e) => e?.message)}
+                      zone={null}
+                      index={0}
+                      raw={form.getValues(`records.${index}.raw`)}
+                    />
+                  )}
+                />
+              </fieldset>
+            );
+          })}
+          <div>
+            <Button size="sm" onPress={() => records.append({ name: "@", type: "A", ttl: "3600", ...emptyRow("A") })}>
               <Plus aria-hidden />
               Add record
             </Button>
           </div>
-        </fieldset>
+        </div>
         <DialogFooter>
           <Button onPress={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" variant="primary" isPending={save.isPending}>

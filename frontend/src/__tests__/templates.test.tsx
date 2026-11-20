@@ -25,18 +25,23 @@ describe("templates", () => {
     expect(await within(dialog).findByText("Enter a name.")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Name"), "Mail");
     await user.click(within(dialog).getByRole("button", { name: "Add record" }));
-    await user.click(within(dialog).getByRole("button", { name: /Record 1 type/ }));
+    const record = within(dialog).getByRole("group", { name: "Record 1" });
+    await user.click(within(record).getByRole("button", { name: /Type/ }));
     await user.click(await screen.findByRole("option", { name: "MX" }));
-    await user.type(within(dialog).getByRole("textbox", { name: "Record 1 content" }), "10 mail.example.com");
+    await user.type(within(record).getByRole("textbox", { name: "Priority" }), "10");
+    await user.type(within(record).getByRole("textbox", { name: "Mail server" }), "mail");
+    expect(within(record).getByText(".<zone>")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Save template" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: "Edit Basic web" }));
     dialog = await screen.findByRole("dialog", { name: "Edit Basic web" });
     await user.click(within(dialog).getByRole("button", { name: "Remove record 2" }));
-    const content = within(dialog).getByRole("textbox", { name: "Record 1 content" });
+    const content = within(within(dialog).getByRole("group", { name: "Record 1" })).getByRole("textbox", {
+      name: "IPv4 address",
+    });
     await user.clear(content);
-    await user.type(content, "bad");
+    await user.type(content, "999.0.0.1");
     await user.click(within(dialog).getByRole("button", { name: "Save template" }));
     expect(await within(dialog).findByText(/Enter an IPv4 address/)).toBeInTheDocument();
     await user.clear(content);
@@ -57,7 +62,7 @@ describe("templates", () => {
           {
             name: "Mail",
             description: "",
-            records: [{ name: "@", type: "MX", ttl: 3600, content: "10 mail.example.com." }],
+            records: [{ name: "@", type: "MX", ttl: 3600, content: "10 mail" }],
           },
         ],
         [

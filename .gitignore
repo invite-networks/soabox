@@ -21,3 +21,4 @@ node_modules/
 
 # local agent state
 /.claude/agent-memory-local/
+/.claude/worktrees/

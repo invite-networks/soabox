@@ -33,6 +33,8 @@ export interface TextFieldProps extends BaseFieldProps {
   type?: "text" | "password" | "email" | "number" | "date" | "search" | "url";
   inputMode?: "text" | "numeric";
   inputRef?: Ref<HTMLInputElement>;
+  /** Muted text shown after the input, such as a zone name that will be appended. */
+  suffix?: string | undefined;
 }
 
 function common(props: BaseFieldProps) {
@@ -65,11 +67,21 @@ export function TextField(props: TextFieldProps) {
       {...(props.inputMode ? { inputMode: props.inputMode } : {})}
     >
       <FieldLabel label={props.label} hideLabel={props.hideLabel} />
-      <Input
-        {...(props.inputRef ? { ref: props.inputRef } : {})}
-        {...(props.placeholder ? { placeholder: props.placeholder } : {})}
-        className={`${fieldInput} ${props.mono ? "font-mono" : ""}`}
-      />
+      {/* The wrapper is always present so the input keeps focus when a suffix appears or goes away. */}
+      <div className="flex min-w-0">
+        <Input
+          {...(props.inputRef ? { ref: props.inputRef } : {})}
+          {...(props.placeholder ? { placeholder: props.placeholder } : {})}
+          className={`${fieldInput} min-w-0 ${props.suffix ? "rounded-r-none" : ""} ${props.mono ? "font-mono" : ""}`}
+        />
+        {props.suffix && (
+          <span
+            className={`flex max-w-[60%] items-center truncate rounded-r-md border border-l-0 border-border-strong bg-surface-hover px-2 text-sm text-fg-muted ${props.mono ? "font-mono" : ""}`}
+          >
+            {props.suffix}
+          </span>
+        )}
+      </div>
       {props.description && (
         <Text slot="description" className={fieldDescription}>
           {props.description}

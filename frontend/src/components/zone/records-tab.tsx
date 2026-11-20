@@ -34,6 +34,7 @@ import {
   type Tone,
   Tr,
 } from "../ui";
+import { RecordContent } from "./record-value-fields";
 import { RrSetDialog } from "./rrset-dialog";
 import { RecordType } from "./zone-labels";
 
@@ -197,7 +198,9 @@ export function RecordsTab({ zone }: { zone: Zone }) {
                       <ul className={status === "deleted" ? "line-through" : ""}>
                         {rrset.records.map((record) => (
                           <li key={record.content} className="flex flex-wrap items-center gap-2">
-                            <span className={record.disabled ? "text-fg-muted" : ""}>{record.content}</span>
+                            <span className={record.disabled ? "text-fg-muted" : ""}>
+                              <RecordContent type={rrset.type} content={record.content} zone={zone.name} />
+                            </span>
                             {record.disabled && <Badge>Disabled</Badge>}
                           </li>
                         ))}

@@ -29,9 +29,9 @@ describe("record editor", () => {
     await user.click(screen.getByRole("button", { name: "Add record" }));
     let dialog = await screen.findByRole("dialog", { name: "Add records" });
     await user.type(within(dialog).getByLabelText("Name"), "api");
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 1" }), "192.0.2.20");
+    await user.type(within(dialog).getByRole("textbox", { name: "IPv4 address" }), "192.0.2.20");
     await user.click(within(dialog).getByRole("button", { name: "Add value" }));
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 2" }), "192.0.2.21");
+    await user.type(within(dialog).getByRole("textbox", { name: "IPv4 address 2" }), "192.0.2.21");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(within(row("api")).getByText("Added")).toBeInTheDocument();
@@ -97,26 +97,111 @@ describe("record editor", () => {
     expect(screen.queryByRole("region", { name: "Pending changes" })).not.toBeInTheDocument();
   });
 
-  it("validates content per type", async () => {
+  it("validates each field per type", async () => {
     const { user } = await openZone();
     await user.click(screen.getByRole("button", { name: "Add record" }));
     const dialog = await screen.findByRole("dialog", { name: "Add records" });
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 1" }), "not-an-ip");
+    const address = within(dialog).getByRole("textbox", { name: "IPv4 address" });
+    await user.type(address, "abc999.1.1.1");
+    expect(address).toHaveValue("999.1.1.1");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
     expect(await within(dialog).findByText(/Enter an IPv4 address/)).toBeInTheDocument();
-    expect(within(dialog).getByRole("textbox", { name: "Value 1" })).toHaveFocus();
+    await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "IPv4 address" })).toHaveFocus());
 
     await user.click(within(dialog).getByRole("button", { name: /Type/ }));
     await user.click(await screen.findByRole("option", { name: "MX" }));
-    await user.clear(within(dialog).getByRole("textbox", { name: "Value 1" }));
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 1" }), "mail.example.com");
+    const priority = within(dialog).getByRole("textbox", { name: "Priority" });
+    await user.type(priority, "7x0000");
+    expect(priority).toHaveValue("70000");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
-    expect(await within(dialog).findByText(/Enter a priority and a host name/)).toBeInTheDocument();
+    expect(await within(dialog).findByText("Enter a number from 0 to 65535.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Mail server is required.")).toBeInTheDocument();
 
     await user.clear(within(dialog).getByLabelText("Name"));
     await user.type(within(dialog).getByLabelText("Name"), "x.other.net.");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
     expect(await within(dialog).findByText("The name must be inside example.com.")).toBeInTheDocument();
+  });
+
+  it("appends the zone to relative host names and shows the suffix", async () => {
+    const calls = recordMutations();
+    server.use(http.patch("/v1/zones/:id/rrsets", noContent));
+    const { user } = await openZone();
+    await user.click(screen.getByRole("button", { name: "Add record" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add records" });
+    await user.click(within(dialog).getByRole("button", { name: /Type/ }));
+    await user.click(await screen.findByRole("option", { name: "MX" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "Priority" }), "10");
+    await user.type(within(dialog).getByRole("textbox", { name: "Mail server" }), "mail");
+    expect(within(dialog).getByText(".example.com.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Add value" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "Priority 2" }), "20");
+    await user.type(within(dialog).getByRole("textbox", { name: "Mail server 2" }), "mx.other.net.");
+    await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const apex = within(screen.getByRole("table", { name: "Records" })).getAllByRole("rowheader", { name: "@" });
+    const mx = apex.map((h) => h.closest("tr") as HTMLElement).find((r) => within(r).queryByText("MX"));
+    expect(mx).toBeDefined();
+    const suffix = within(mx as HTMLElement).getByText(".example.com.");
+    expect(suffix).toHaveClass("text-fg-muted");
+    expect(within(mx as HTMLElement).getByText("10 mail")).toBeInTheDocument();
+    expect(within(mx as HTMLElement).getByText("20 mx.other.net.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Review and apply" }));
+    const review = await screen.findByRole("dialog", { name: "Review pending changes" });
+    await user.click(within(review).getByRole("button", { name: "Apply 1 change" }));
+    await waitFor(() =>
+      expect(calls[0]?.body).toEqual({
+        rrsets: [
+          {
+            name: "example.com.",
+            type: "MX",
+            ttl: 3600,
+            changetype: "REPLACE",
+            records: [
+              { content: "10 mail.example.com.", disabled: false },
+              { content: "20 mx.other.net.", disabled: false },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+
+  it("edits the SOA as separate fields", async () => {
+    const calls = recordMutations();
+    server.use(http.patch("/v1/zones/:id/rrsets", noContent));
+    const { user } = await openZone();
+    await user.click(screen.getByRole("button", { name: "Edit @ SOA" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit SOA records" });
+    expect(within(dialog).getByRole("textbox", { name: "Primary name server" })).toHaveValue("ns1");
+    const contact = within(dialog).getByRole("textbox", { name: "Contact email" });
+    expect(contact).toHaveValue("hostmaster");
+    const refresh = within(dialog).getByRole("textbox", { name: "Refresh (seconds)" });
+    expect(refresh).toHaveValue("10800");
+    await user.clear(refresh);
+    await user.type(refresh, "72OO0");
+    expect(refresh).toHaveValue("720");
+    await user.clear(contact);
+    await user.type(contact, "dns-admin@example.net");
+    await user.click(within(dialog).getByRole("button", { name: "Save to pending changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Review and apply" }));
+    const review = await screen.findByRole("dialog", { name: "Review pending changes" });
+    await user.click(within(review).getByRole("button", { name: "Apply 1 change" }));
+    await waitFor(() =>
+      expect(calls[0]?.body).toMatchObject({
+        rrsets: [
+          {
+            type: "SOA",
+            records: [
+              { content: "ns1.example.com. dns-admin.example.net. 2026111901 720 3600 604800 3600", disabled: false },
+            ],
+          },
+        ],
+      }),
+    );
   });
 
   it("rejects a CNAME next to other records and merges values into an existing RRset", async () => {
@@ -126,7 +211,7 @@ describe("record editor", () => {
     await user.type(within(dialog).getByLabelText("Name"), "www");
     await user.click(within(dialog).getByRole("button", { name: /Type/ }));
     await user.click(await screen.findByRole("option", { name: "CNAME" }));
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 1" }), "target.example.net");
+    await user.type(within(dialog).getByRole("textbox", { name: "Target" }), "target.example.net.");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
     expect(await within(dialog).findByText("A CNAME cannot share a name with other records.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -134,7 +219,7 @@ describe("record editor", () => {
     await user.click(screen.getByRole("button", { name: "Add record" }));
     dialog = await screen.findByRole("dialog", { name: "Add records" });
     await user.type(within(dialog).getByLabelText("Name"), "www");
-    await user.type(within(dialog).getByRole("textbox", { name: "Value 1" }), "192.0.2.11");
+    await user.type(within(dialog).getByRole("textbox", { name: "IPv4 address" }), "192.0.2.11");
     await user.click(within(dialog).getByRole("button", { name: "Add to pending changes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     const www = row("www");

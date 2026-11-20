@@ -1,38 +1,31 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import type { RrSet } from "../../api/types";
-import {
-  EDIT_ONLY_TYPES,
-  isInZone,
-  normalizeContent,
-  toAbsoluteName,
-  toRelativeName,
-  validateContent,
-} from "../../lib/dns";
+import { EDIT_ONLY_TYPES, isInZone, toAbsoluteName, toRelativeName } from "../../lib/dns";
+import { emptyRow, type RowValue, rowContent, rowErrors, rowFromContent } from "../../lib/record-rows";
 import { Alert, Button, Checkbox, Dialog, DialogFooter, FieldGrid, Form, SelectField, TextField } from "../ui";
+import { RecordValueFields } from "./record-value-fields";
 
 const DEFAULT_TTL = 3600;
-
-const PLACEHOLDERS: Record<string, string> = {
-  A: "192.0.2.10",
-  AAAA: "2001:db8::10",
-  CNAME: "target.example.com.",
-  MX: "10 mail.example.com.",
-  NS: "ns1.example.com.",
-  PTR: "host.example.com.",
-  SRV: "10 5 5060 sip.example.com.",
-  TXT: "v=spf1 -all",
-  CAA: '0 issue "ca.example.net"',
-};
 
 const formSchema = z.object({
   name: z.string(),
   type: z.string().min(1, "Choose a type."),
   ttl: z.string().regex(/^\d+$/, "Enter a whole number of seconds."),
-  records: z.array(z.object({ content: z.string(), disabled: z.boolean() })).min(1),
+  records: z
+    .array(
+      z.object({
+        values: z.array(z.string()),
+        initial: z.array(z.string()).nullable(),
+        original: z.string().nullable(),
+        raw: z.boolean(),
+        disabled: z.boolean(),
+      }),
+    )
+    .min(1),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -54,10 +47,18 @@ function initialValues(editing: RrSet | null, zoneName: string, defaultType: str
       name: toRelativeName(editing.name, zoneName),
       type: editing.type,
       ttl: String(editing.ttl),
-      records: editing.records.map((r) => ({ content: r.content, disabled: r.disabled })),
+      records: editing.records.map((r) => ({
+        ...rowFromContent(editing.type, r.content, zoneName),
+        disabled: r.disabled,
+      })),
     };
   }
-  return { name: "", type: defaultType, ttl: String(DEFAULT_TTL), records: [{ content: "", disabled: false }] };
+  return {
+    name: "",
+    type: defaultType,
+    ttl: String(DEFAULT_TTL),
+    records: [{ ...emptyRow(defaultType), disabled: false }],
+  };
 }
 
 /** Add or edit one RRset. The result is collected as a pending change. */
@@ -81,14 +82,15 @@ export function RrSetDialog(props: RrSetDialogProps) {
       }
     }
     values.records.forEach((record, index) => {
-      const message = validateContent(values.type, record.content);
-      if (message) {
-        ctx.addIssue({ code: "custom", path: ["records", index, "content"], message });
-      }
+      rowErrors(values.type, record as RowValue, zoneName).forEach((message, j) => {
+        if (message) {
+          ctx.addIssue({ code: "custom", path: ["records", index, "values", j], message });
+        }
+      });
     });
-    const normalized = values.records.map((r) => normalizeContent(values.type, r.content));
-    if (new Set(normalized).size !== normalized.length) {
-      ctx.addIssue({ code: "custom", path: ["records", 0, "content"], message: "Each value must be unique." });
+    const contents = values.records.map((r) => rowContent(values.type, r as RowValue, zoneName));
+    if (new Set(contents).size !== contents.length) {
+      ctx.addIssue({ code: "custom", path: ["records", "root"], message: "Each value must be unique." });
     }
   });
 
@@ -99,6 +101,7 @@ export function RrSetDialog(props: RrSetDialogProps) {
   const records = useFieldArray({ control: form.control, name: "records" });
   const type = form.watch("type");
   const singleRecord = EDIT_ONLY_TYPES.has(type) || type === "CNAME";
+  const valuesRef = useRef<HTMLFieldSetElement>(null);
 
   useEffect(() => {
     if (props.isOpen) {
@@ -106,22 +109,34 @@ export function RrSetDialog(props: RrSetDialogProps) {
     }
   }, [props.isOpen, editing, zoneName, defaultType, form]);
 
-  const submit = form.handleSubmit((values) => {
-    props.onSave({
-      name: toAbsoluteName(values.name, zoneName),
-      type: values.type,
-      ttl: Number(values.ttl),
-      records: values.records.map((r) => ({ content: normalizeContent(values.type, r.content), disabled: r.disabled })),
-      comments: editing?.comments ?? [],
-    });
-    props.onOpenChange(false);
-  });
+  const submit = form.handleSubmit(
+    (values) => {
+      props.onSave({
+        name: toAbsoluteName(values.name, zoneName),
+        type: values.type,
+        ttl: Number(values.ttl),
+        records: values.records.map((r) => ({
+          content: rowContent(values.type, r as RowValue, zoneName),
+          disabled: r.disabled,
+        })),
+        comments: editing?.comments ?? [],
+      });
+      props.onOpenChange(false);
+    },
+    (errors) => {
+      if (!errors.name && !errors.ttl) {
+        // Value fields are controlled groups, so move focus to the first invalid input ourselves.
+        requestAnimationFrame(() => valuesRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
+      }
+    },
+  );
 
   const typeOptions = (isEdit ? [editing.type] : allowedTypes.filter((t) => !EDIT_ONLY_TYPES.has(t))).map((t) => ({
     id: t,
     label: t,
   }));
-  const rootError = form.formState.errors.records?.root?.message ?? form.formState.errors.records?.message;
+  const recordErrors = form.formState.errors.records;
+  const rootError = recordErrors?.root?.message ?? recordErrors?.message;
 
   return (
     <Dialog
@@ -158,7 +173,10 @@ export function RrSetDialog(props: RrSetDialogProps) {
               <SelectField
                 label="Type"
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => {
+                  field.onChange(value);
+                  records.replace([{ ...emptyRow(value), disabled: false }]);
+                }}
                 options={typeOptions}
                 isDisabled={isEdit}
                 errorMessage={fieldState.error?.message}
@@ -173,7 +191,7 @@ export function RrSetDialog(props: RrSetDialogProps) {
                 label="TTL (seconds)"
                 inputMode="numeric"
                 value={field.value}
-                onChange={field.onChange}
+                onChange={(value) => field.onChange(value.replace(/\D/g, ""))}
                 onBlur={field.onBlur}
                 inputRef={field.ref}
                 errorMessage={fieldState.error?.message}
@@ -182,31 +200,28 @@ export function RrSetDialog(props: RrSetDialogProps) {
             )}
           />
         </FieldGrid>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-medium text-fg">Values</legend>
+        <fieldset ref={valuesRef} className="flex flex-col gap-3">
+          <legend className="mb-1 text-sm font-medium text-fg">{records.fields.length > 1 ? "Values" : "Value"}</legend>
           {records.fields.map((item, index) => (
             <div key={item.id} className="flex items-start gap-2">
-              <div className="flex-1">
-                <Controller
-                  control={form.control}
-                  name={`records.${index}.content`}
-                  render={({ field, fieldState }) => (
-                    <TextField
-                      label={`Value ${index + 1}`}
-                      hideLabel
-                      placeholder={PLACEHOLDERS[type] ?? ""}
-                      value={field.value}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      inputRef={field.ref}
-                      errorMessage={fieldState.error?.message}
-                      mono
-                      autoComplete="off"
-                    />
-                  )}
-                />
-              </div>
-              <div className="flex h-8 items-center gap-2">
+              <Controller
+                control={form.control}
+                name={`records.${index}.values`}
+                render={({ field }) => (
+                  <RecordValueFields
+                    type={type}
+                    values={field.value}
+                    onChange={field.onChange}
+                    errors={(recordErrors?.[index]?.values as { message?: string }[] | undefined)?.map(
+                      (e) => e?.message,
+                    )}
+                    zone={zoneName}
+                    index={index}
+                    raw={form.getValues(`records.${index}.raw`)}
+                  />
+                )}
+              />
+              <div className={`flex h-8 shrink-0 items-center gap-2 ${index === 0 ? "mt-6" : ""}`}>
                 <Controller
                   control={form.control}
                   name={`records.${index}.disabled`}
@@ -231,7 +246,7 @@ export function RrSetDialog(props: RrSetDialogProps) {
           {rootError && <Alert tone="danger">{rootError}</Alert>}
           {!singleRecord && (
             <div>
-              <Button size="sm" onPress={() => records.append({ content: "", disabled: false })}>
+              <Button size="sm" onPress={() => records.append({ ...emptyRow(type), disabled: false })}>
                 <Plus aria-hidden />
                 Add value
               </Button>
