@@ -4,7 +4,7 @@
 
 - Docker Desktop with Compose v2
 - Rust stable (edition 2024) with `cargo-nextest`, `cargo-llvm-cov`, `cargo-audit`, `cargo-deny`
-- Node.js 22 or later with pnpm
+- Node.js 26 or later with pnpm (`npm install -g pnpm`, since Node 26 no longer bundles corepack)
 - `pre-commit`
 
 ## First Run
