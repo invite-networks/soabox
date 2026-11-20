@@ -14,6 +14,7 @@ mod users;
 pub use accounts::Account;
 pub use api_keys::{ApiKeyRecord, NewApiKey, Role};
 pub use history::{HistoryEntry, HistoryFilter, NewHistory};
+pub use settings::OidcProviderRecord;
 pub use templates::{Template, TemplateRecord};
 pub use users::{NewUser, SessionRecord, User, UserRole, UserStatus};
 

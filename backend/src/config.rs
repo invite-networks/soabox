@@ -140,7 +140,7 @@ impl Config {
                 client_secret: Secret::new(r.secret_required("SOABOX_OIDC_CLIENT_SECRET")?),
                 button_label: r
                     .optional("SOABOX_OIDC_BUTTON_LABEL")
-                    .unwrap_or_else(|| "Sign in with SSO".to_owned()),
+                    .unwrap_or_else(|| crate::auth::provider::DEFAULT_BUTTON_LABEL.to_owned()),
             }),
         };
 
@@ -221,8 +221,9 @@ impl Config {
         })
     }
 
-    /// True when the given OIDC settings are present.
-    pub fn oidc_enabled(&self) -> bool {
+    /// True when OIDC is set by `SOABOX_OIDC_*` variables. These take
+    /// precedence over settings saved in the UI.
+    pub fn oidc_from_env(&self) -> bool {
         self.oidc.is_some()
     }
 }
@@ -416,7 +417,7 @@ mod tests {
         v.insert("SOABOX_OIDC_CLIENT_ID".into(), "client".into());
         v.insert("SOABOX_OIDC_CLIENT_SECRET".into(), "secret".into());
         let c = Config::from_map(&v).expect("valid");
-        assert!(c.oidc_enabled());
+        assert!(c.oidc_from_env());
         assert_eq!(
             format!("{:?}", c.oidc.expect("oidc").client_secret),
             "[redacted]"

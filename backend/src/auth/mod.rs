@@ -3,6 +3,7 @@
 pub mod crypto;
 pub mod local;
 pub mod oidc;
+pub mod provider;
 
 use axum::extract::FromRequestParts;
 use axum::http::Method;

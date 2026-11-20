@@ -7,6 +7,7 @@ import type {
   HistoryEntry,
   Me,
   Metadata,
+  OidcSettings,
   Permissions,
   ServerInfo,
   ServerItem,
@@ -298,6 +299,16 @@ export const settings: Settings = {
   record_types_forward: ["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "CAA", "NS"],
   record_types_reverse: ["PTR", "NS", "TXT"],
   auto_ptr: true,
+};
+
+export const oidcSettings: OidcSettings = {
+  source: "database",
+  enabled: false,
+  issuer: "",
+  client_id: "",
+  client_secret_set: false,
+  button_label: "Sign in with SSO",
+  redirect_uri: "http://localhost:3000/auth/oidc/callback",
 };
 
 export const tsigKeys: TsigKey[] = [{ id: "transfer.", name: "transfer", algorithm: "hmac-sha256" }];

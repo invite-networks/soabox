@@ -50,6 +50,7 @@ const OPERATION_LABELS: Record<string, string> = {
   "template.update": "Updated template",
   "template.delete": "Deleted template",
   "settings.update": "Changed settings",
+  "settings.oidc_update": "Changed single sign-on",
 };
 
 /** A readable operation name with the raw operation code beneath it. */

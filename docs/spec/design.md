@@ -100,6 +100,7 @@ See the [entity relationship diagram](../uml/data-model.md). Tables arrive by mi
 | `api_key_networks` | 1 | Allowed client CIDRs. |
 | `history` | 1 | Audit rows: time, actor type and id, actor name, client IP, operation, zone, outcome, upstream status, diff, detail. |
 | `settings` | 1 | Key and value pairs for Admin settings. |
+| `oidc_provider` | 5 | One row: OIDC enabled flag, issuer, client ID, client secret encrypted under `SOABOX_SECRET_KEY`, button label, last update time. |
 | `users` | 2 | Username, display name, email, role, auth source, OIDC issuer and subject, password hash, encrypted TOTP secret, status. |
 | `sessions` | 2 | Session id hash, user, CSRF token, created, last seen, expiry, client IP, user agent. |
 | `account_users`, `user_zones` | 2 | Access assignments. |
@@ -124,7 +125,7 @@ Zone names are stored in PowerDNS canonical form with a trailing dot. SOAbox nev
 ## 5. Authentication Design
 
 - Local: argon2id password hashes, optional TOTP with secrets encrypted with XChaCha20-Poly1305 under `SOABOX_SECRET_KEY`, bound to their purpose as associated data. A TOTP code is accepted at most once (the last accepted time step is stored). Turning TOTP off needs the password and a code. Changing the password ends the user's other sessions. Password and code checks after sign-in are rate limited per account.
-- OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. For Entra, the issuer is the tenant-specific v2.0 endpoint. Users are matched on the `iss` and `sub` claims, which Entra keeps stable for a user within one app registration. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
+- OIDC: backend-run authorization code flow with PKCE, `state`, and `nonce`. Single issuer. The provider settings come from `SOABOX_OIDC_*` when `SOABOX_OIDC_ISSUER` is set, and otherwise from the `oidc_provider` row an Admin edits in the UI ([ADR-0015](../adr/0015-oidc-settings-in-ui.md)). The row is read on each sign-in, so changes apply at once on every instance. The discovery document is cached in memory for the current issuer only, for at most one hour, and dropped when the settings are saved. For Entra, the issuer is the tenant-specific v2.0 endpoint. Users are matched on the `iss` and `sub` claims, which Entra keeps stable for a user within one app registration. See the [sign-in sequence](../uml/sequence-oidc-sign-in.md).
 - Sessions: a random 32-byte id in the cookie, SHA-256 hashed in the database. `HttpOnly`, `Secure`, `SameSite=Lax`. Rotated on sign-in and role change. Idle and absolute timeouts from configuration.
 - CSRF: per-session token sent in a header on state-changing `/v1` calls.
 - Rate limits: failed key attempts per client IP; sign-in failures per client IP, per client IP and username pair, and a higher limit per username across all addresses, so one attacker cannot quickly lock an account out. In memory per process, returning `429`. Behind a proxy, `SOABOX_TRUSTED_PROXIES` must be set or all clients share one limit; SOAbox warns at startup in `prod` when it is empty.

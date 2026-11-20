@@ -99,6 +99,15 @@ erDiagram
         text key PK
         text value
     }
+    oidc_provider {
+        int id PK "always 1"
+        int enabled
+        text issuer
+        text client_id
+        blob client_secret_enc
+        text button_label
+        int updated_at
+    }
 ```
 
-`history` and `settings` have no foreign keys on purpose. History must survive deletion of the actor or zone it describes.
+`history`, `settings`, and `oidc_provider` have no foreign keys on purpose. History must survive deletion of the actor or zone it describes.

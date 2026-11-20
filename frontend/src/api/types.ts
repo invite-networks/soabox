@@ -436,6 +436,29 @@ export interface Settings {
   auto_ptr: boolean;
 }
 
+/** Where the single sign-on settings in force come from. */
+export type OidcSource = "environment" | "database";
+
+/** Single sign-on provider settings. The client secret is never returned. */
+export interface OidcSettings {
+  source: OidcSource;
+  enabled: boolean;
+  issuer: string;
+  client_id: string;
+  client_secret_set: boolean;
+  button_label: string;
+  redirect_uri: string;
+}
+
+export interface OidcSettingsUpdate {
+  enabled: boolean;
+  issuer: string;
+  client_id: string;
+  /** A new secret. Omit to keep the stored one. */
+  client_secret?: string;
+  button_label: string;
+}
+
 // TSIG
 
 export interface TsigKey {

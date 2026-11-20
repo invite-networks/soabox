@@ -55,6 +55,7 @@ export const handlers = [
   http.get("/v1/users", () => json(f.users)),
   http.get("/v1/api-keys", () => json(f.apiKeys)),
   http.get("/v1/settings", () => json(f.settings)),
+  http.get("/v1/settings/oidc", () => json(f.oidcSettings)),
   http.get("/v1/tsigkeys", () => json(f.tsigKeys)),
   http.get("/v1/tsigkeys/:id", () => json({ ...f.tsigKeys[0], key: btoa("secret-key") })),
 ];

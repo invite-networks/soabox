@@ -64,6 +64,8 @@ use crate::{auth, v1};
         v1::admin::delete_account,
         v1::admin::get_settings,
         v1::admin::put_settings,
+        v1::admin::get_oidc_settings,
+        v1::admin::put_oidc_settings,
         v1::admin::list_tsig,
         v1::admin::create_tsig,
         v1::admin::get_tsig,
