@@ -10,7 +10,7 @@ PowerDNS client would, so each change is checked and recorded in history.
 All names and addresses use reserved documentation ranges (RFC 2606, 5737, 3849).
 
 Usage:
-    SOABOX_URL=http://localhost:18080 SOABOX_API_KEY=... uv run scripts/seed-demo.py
+    SOABOX_URL=http://localhost:8080 SOABOX_API_KEY=... uv run scripts/seed-demo.py
 
 Create an Admin key first, for example:
     docker compose exec soabox soabox apikey create --role admin --description demo-seed
