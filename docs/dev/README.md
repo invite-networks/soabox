@@ -10,3 +10,4 @@ Everything needed to build, run, and change SOAbox. Commands marked **Planned, n
 | [Coding standards](coding-standards.md) | Conventions for Rust, TypeScript, commits, and branches. |
 | [Logging](logging.md) | Log format, levels, and what is never logged. |
 | [Testing](testing.md) | Test tiers, commands, and CI checks. |
+| [Releasing](releasing.md) | Version tags and publishing the image to GHCR. |
