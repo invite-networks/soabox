@@ -23,8 +23,9 @@ pub struct AppState {
     /// A higher limit per username across all addresses, so one attacker
     /// cannot lock an account out quickly but a distributed guess is slowed.
     pub login_users: Arc<FailureLimiter>,
-    /// OIDC provider metadata, discovered on first use.
-    pub oidc_metadata: Arc<tokio::sync::OnceCell<openidconnect::core::CoreProviderMetadata>>,
+    /// OIDC provider discovery document for the current issuer, refreshed
+    /// when the issuer changes, the settings are saved, or it ages out.
+    pub oidc_metadata: Arc<crate::auth::provider::MetadataCache>,
 }
 
 impl AppState {
@@ -49,7 +50,7 @@ impl AppState {
             keys: Arc::new(KeyService::default()),
             logins: Arc::new(FailureLimiter::new(10, Duration::from_secs(300))),
             login_users: Arc::new(FailureLimiter::new(100, Duration::from_secs(300))),
-            oidc_metadata: Arc::new(tokio::sync::OnceCell::new()),
+            oidc_metadata: Arc::new(crate::auth::provider::MetadataCache::default()),
         })
     }
 

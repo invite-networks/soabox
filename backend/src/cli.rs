@@ -239,7 +239,8 @@ pub async fn create_admin(store: &Store, username: &str) -> anyhow::Result<Strin
     Ok(password)
 }
 
-/// Re-encrypts TOTP secrets with the current key. Returns how many.
+/// Re-encrypts TOTP secrets and the stored OIDC client secret with the
+/// current key. Returns how many.
 pub async fn rotate_secrets(state: &AppState) -> anyhow::Result<usize> {
     let keys = state.secret_keys();
     let mut n = 0;
@@ -257,6 +258,9 @@ pub async fn rotate_secrets(state: &AppState) -> anyhow::Result<usize> {
             .await?
             .is_some_and(|u| u.totp_enabled);
         state.store.set_totp(id, Some(&fresh), enabled).await?;
+        n += 1;
+    }
+    if crate::auth::provider::rotate_secret(state).await? {
         n += 1;
     }
     Ok(n)

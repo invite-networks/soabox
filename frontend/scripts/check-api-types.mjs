@@ -40,6 +40,8 @@ const MAP = {
   CreatedKey: "CreatedApiKey",
   KeyInput: "ApiKeyInput",
   Settings: "Settings",
+  OidcSettings: "OidcSettings",
+  OidcSettingsUpdate: "OidcSettingsUpdate",
   NewTsig: "CreateTsigKeyRequest",
 };
 

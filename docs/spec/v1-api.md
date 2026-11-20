@@ -163,6 +163,10 @@ Admins see and manage all keys. Users with create_api_keys see and manage their 
 |---|---|---|
 | `GET /v1/settings` | | `Settings` |
 | `PUT /v1/settings` | partial `Settings` | `Settings` |
+| `GET /v1/settings/oidc` | | `OidcSettings` |
+| `PUT /v1/settings/oidc` | `{"enabled", "issuer", "client_id", "client_secret"?, "button_label"}` | `OidcSettings`. `409` when set by environment. `422` on validation errors. |
+
+`OidcSettings`: `{"source": "environment"or"database", "enabled", "issuer", "client_id", "client_secret_set", "button_label", "redirect_uri"}`. The client secret is write-only: it is never returned. Omit `client_secret` or send it empty to keep the stored one. Saving is recorded in history as `settings.oidc_update` with `client_secret_changed` instead of the value.
 
 ## TSIG Keys (manage_tsig)
 

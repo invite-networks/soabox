@@ -57,6 +57,23 @@ async fn exercise(s: &Store) {
         Some("2")
     );
 
+    let provider = soabox::store::OidcProviderRecord {
+        enabled: true,
+        issuer: "https://login.example.test/v2.0".into(),
+        client_id: format!("client-{suffix}"),
+        client_secret_enc: Some(vec![0, 1, 2, 255]),
+        button_label: "Sign in".into(),
+        updated_at: 0,
+    };
+    s.put_oidc_provider(&provider).await.expect("put provider");
+    s.put_oidc_provider(&provider)
+        .await
+        .expect("upsert provider");
+    let got = s.oidc_provider().await.expect("get").expect("row");
+    assert_eq!(got.client_id, provider.client_id);
+    assert_eq!(got.client_secret_enc, provider.client_secret_enc);
+    assert!(got.enabled);
+
     let hid = s
         .insert_history(&NewHistory {
             actor_type: "api_key".into(),

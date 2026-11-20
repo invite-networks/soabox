@@ -39,6 +39,7 @@ All tests use synthetic data, isolated databases, and no live credentials.
 | FR-AUTH-03, 04 | Mock OIDC provider: code flow, PKCE, state, nonce, create and approve modes | Integration, End-to-end |
 | FR-AUTH-05 | Matrix of OIDC configured, setting, and role | Integration |
 | FR-AUTH-06 | Bootstrap variables and CLI | Integration |
+| FR-AUTH-10 to 12 | Settings round trip, live reload of the client, secret never in responses, database plaintext, or history, rotation, environment precedence | Unit, Integration, Component |
 | FR-AUTH-07, 09 | Rotation, idle and absolute timeout, sign-out, revoke | Integration |
 | FR-AUTH-08 | Rate limit trips and resets | Unit, Integration |
 | FR-RBAC-01 to 05 | Access matrix for each role and setting through `/v1` and `/api` | Integration |
