@@ -390,6 +390,30 @@ export function absoluteHost(value: string, zone: string | null, mailbox = false
   return v === "@" ? zone : `${v}.${zone}`;
 }
 
+/**
+ * Shows a DNS mailbox (`hostmaster.example.com.`) as an email address (`hostmaster@example.com`).
+ * The first unescaped dot separates the local part. `.` and names without a domain are kept.
+ */
+export function mailboxToEmail(value: string): string {
+  if (value === "." || value.includes("@")) {
+    return value;
+  }
+  let i = 0;
+  while (i < value.length) {
+    if (value[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (value[i] === ".") {
+      break;
+    }
+    i += 1;
+  }
+  const local = value.slice(0, i).replace(/\\\./g, ".");
+  const domain = value.slice(i + 1).replace(/\.$/, "");
+  return local && domain ? `${local}@${domain}` : value;
+}
+
 /** True when the typed host name will have the zone appended. */
 export function getsZoneSuffix(field: FieldDef, value: string): boolean {
   if (!isHostKind(field)) {
@@ -448,6 +472,8 @@ export function parseFields(type: string, content: string, zone: string | null):
       values.push(unquote(token));
     } else if (token.quoted) {
       return null;
+    } else if (def.kind === "mailbox") {
+      values.push(mailboxToEmail(token.text));
     } else if (isHostKind(def)) {
       values.push(relativeHost(token.text, zone));
     } else {
@@ -598,7 +624,8 @@ export function displayParts(type: string, content: string, zone: string): Value
     const sep = i === 0 ? "" : " ";
     const lower = token.text.toLowerCase();
     const inZone = lower === z || lower.endsWith(`.${z}`);
-    if (def && !def.rest && isHostKind(def) && !token.quoted && inZone) {
+    // Mailboxes (SOA and RP contacts) are email addresses, so they are shown as stored.
+    if (def && !def.rest && def.kind === "host" && !token.quoted && inZone) {
       const head = lower === z ? "" : token.text.slice(0, token.text.length - z.length - 1);
       push({ text: `${sep}${head}` });
       push({ text: head === "" ? zone : `.${zone}`, suffix: true });

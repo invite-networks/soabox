@@ -4,6 +4,7 @@ import {
   composeFields,
   displayParts,
   fieldsFor,
+  mailboxToEmail,
   parseFields,
   RECORD_FIELDS,
   restrictInput,
@@ -42,7 +43,7 @@ describe("record fields", () => {
       [
         "SOA",
         "ns1.example.com. hostmaster.example.com. 1 10800 3600 604800 3600",
-        ["ns1", "hostmaster", "1", "10800", "3600", "604800", "3600"],
+        ["ns1", "hostmaster@example.com", "1", "10800", "3600", "604800", "3600"],
       ],
       ["NAPTR", '100 10 "U" "E2U+sip" "!^.*$!sip:a@b!" .', ["100", "10", "U", "E2U+sip", "!^.*$!sip:a@b!", "."]],
     ];
@@ -57,6 +58,14 @@ describe("record fields", () => {
     const stored = composeFields("TXT", [long], zone);
     expect(stored).toBe(`"${"a".repeat(255)}" "${"a".repeat(45)}"`);
     expect(parseFields("TXT", stored, zone)).toEqual([long]);
+  });
+
+  it("shows mailboxes as email addresses", () => {
+    expect(mailboxToEmail("hostmaster.corp.example.")).toBe("hostmaster@corp.example");
+    expect(mailboxToEmail("first\\.last.example.net.")).toBe("first.last@example.net");
+    expect(mailboxToEmail(".")).toBe(".");
+    expect(composeFields("RP", ["admin@example.net", "."], zone)).toBe("admin.example.net. .");
+    expect(parseFields("RP", "admin.example.net. .", zone)).toEqual(["admin@example.net", "."]);
   });
 
   it("returns null for content the fields cannot hold", () => {
@@ -91,9 +100,7 @@ describe("record fields", () => {
     expect(displayParts("SOA", "ns1.example.com. hostmaster.example.com. 1 2 3 4 5", zone)).toEqual([
       { text: "ns1" },
       { text: ".example.com.", suffix: true },
-      { text: " hostmaster" },
-      { text: ".example.com.", suffix: true },
-      { text: " 1 2 3 4 5" },
+      { text: " hostmaster.example.com. 1 2 3 4 5" },
     ]);
   });
 });
