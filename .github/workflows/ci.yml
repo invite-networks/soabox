@@ -70,6 +70,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
@@ -78,7 +80,9 @@ jobs:
       - run: cargo deny check
       - name: 72 hour release cooldown
         working-directory: .
-        run: python3 scripts/cargo-cooldown.py backend/Cargo.lock
+        run: |
+          git show origin/main:backend/Cargo.lock > /tmp/base.lock 2>/dev/null || : > /tmp/base.lock
+          python3 scripts/cargo-cooldown.py backend/Cargo.lock 72 /tmp/base.lock
 
   image:
     runs-on: ubuntu-latest

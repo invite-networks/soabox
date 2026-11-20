@@ -1,0 +1,6 @@
+[advisories]
+# RUSTSEC-2023-0071 (rsa, Marvin attack) affects RSA private-key decryption
+# and signing timing. SOAbox uses rsa only through openidconnect to verify
+# ID token signatures with public keys, which the advisory does not cover.
+# Review again when openidconnect moves to rsa 0.10.
+ignore = ["RUSTSEC-2023-0071"]
