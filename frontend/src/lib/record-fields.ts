@@ -45,6 +45,8 @@ export interface FieldDef {
   multiline?: boolean;
   /** Layout hint: wide fields grow to fill the row. */
   wide?: boolean;
+  /** Unit shown after the input, such as "sec". */
+  unit?: string;
 }
 
 const U8 = 255;
@@ -181,10 +183,10 @@ export const RECORD_FIELDS: Readonly<Record<string, readonly FieldDef[]>> = {
     host("primary", "Primary name server", { placeholder: "ns1.example.net." }),
     { key: "contact", label: "Contact email", kind: "mailbox", wide: true, placeholder: "hostmaster@example.com" },
     uint("serial", "Serial", U32),
-    uint("refresh", "Refresh (seconds)", U32, "10800"),
-    uint("retry", "Retry (seconds)", U32, "3600"),
-    uint("expire", "Expire (seconds)", U32, "604800"),
-    uint("minimum", "Negative TTL (seconds)", U32, "3600"),
+    { ...uint("refresh", "Refresh", U32, "10800"), unit: "sec" },
+    { ...uint("retry", "Retry", U32, "3600"), unit: "sec" },
+    { ...uint("expire", "Expire", U32, "604800"), unit: "sec" },
+    { ...uint("minimum", "Negative TTL", U32, "3600"), unit: "sec" },
   ],
   SPF: [{ key: "text", label: "SPF policy", kind: "text", rest: true, wide: true, placeholder: "v=spf1 mx -all" }],
   SRV: [
@@ -518,7 +520,7 @@ const EMAIL_LOCAL = /^[A-Za-z0-9._+-]+$/;
 export function validateField(field: FieldDef, raw: string, zone: string | null): string | null {
   const value = field.kind === "text" ? raw : raw.trim();
   if (value.trim() === "") {
-    return field.optional ? null : `${field.label.replace(/ \(seconds\)$/, "")} is required.`;
+    return field.optional ? null : `${field.label} is required.`;
   }
   switch (field.kind) {
     case "uint":

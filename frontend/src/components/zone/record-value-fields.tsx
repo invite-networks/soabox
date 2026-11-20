@@ -70,7 +70,7 @@ export function RecordValueFields({ type, values, onChange, errors, zone, index,
             />
           );
         } else {
-          const suffix = getsZoneSuffix(def, value) ? `.${zone ?? "<zone>"}` : undefined;
+          const suffix = getsZoneSuffix(def, value) ? `.${zone ?? "<zone>"}` : def.unit;
           control = (
             <TextField
               {...common}

@@ -178,7 +178,7 @@ describe("record editor", () => {
     expect(within(dialog).getByRole("textbox", { name: "Primary name server" })).toHaveValue("ns1");
     const contact = within(dialog).getByRole("textbox", { name: "Contact email" });
     expect(contact).toHaveValue("hostmaster");
-    const refresh = within(dialog).getByRole("textbox", { name: "Refresh (seconds)" });
+    const refresh = within(dialog).getByRole("textbox", { name: "Refresh" });
     expect(refresh).toHaveValue("10800");
     await user.clear(refresh);
     await user.type(refresh, "72OO0");
