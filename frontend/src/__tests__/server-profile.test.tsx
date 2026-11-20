@@ -112,10 +112,10 @@ describe("profile", () => {
     await user.type(within(form).getByLabelText("Current code"), "654321");
     await user.click(within(form).getByRole("button", { name: "Turn off two-factor" }));
     expect(await within(form).findByText("Enter your current password.")).toBeInTheDocument();
-    await user.type(within(form).getByLabelText("Current password"), "pw-123456789");
+    await user.type(within(form).getByLabelText("Current password"), "correct horse battery");
     await user.click(within(form).getByRole("button", { name: "Turn off two-factor" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Wrong code");
-    expect(sent).toEqual({ code: "654321", password: "pw-123456789" });
+    expect(sent).toEqual({ code: "654321", password: "correct horse battery" });
     unmount();
 
     renderApp("/profile", { me: { ...adminMe, user: { ...adminMe.user, auth_source: "oidc" } } });
