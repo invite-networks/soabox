@@ -1,5 +1,5 @@
 import { createMemoryHistory } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import type { Me } from "../api/types";
@@ -22,4 +22,10 @@ export function renderApp(path: string, options: { me?: Me } = {}) {
 /** Waits for the page heading. */
 export function findHeading(name: string | RegExp) {
   return screen.findByRole("heading", { level: 1, name });
+}
+
+/** Searches a zone picker and chooses the matching zone. */
+export async function pickZone(user: ReturnType<typeof userEvent.setup>, container: HTMLElement, zone: string) {
+  await user.type(within(container).getByRole("combobox", { name: "Zones" }), zone.replace(/\.$/, ""));
+  await user.click(await screen.findByRole("option", { name: zone }));
 }

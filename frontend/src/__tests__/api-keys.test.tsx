@@ -3,7 +3,7 @@ import { http } from "msw";
 import { describe, expect, it } from "vitest";
 import { apiKeys, userMe } from "../test/fixtures";
 import { apiError, json, noContent } from "../test/handlers";
-import { findHeading, renderApp } from "../test/render";
+import { findHeading, pickZone, renderApp } from "../test/render";
 import { recordMutations, server } from "../test/server";
 
 describe("API keys", () => {
@@ -27,7 +27,8 @@ describe("API keys", () => {
     await user.click(within(dialog).getByRole("button", { name: "Create key" }));
     expect(await within(dialog).findByText("Describe what the key is for.")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Description"), "Backup job");
-    await user.type(within(dialog).getByLabelText("Zones"), "example.com\nexample.org.");
+    await pickZone(user, dialog, "example.com.");
+    await pickZone(user, dialog, "example.org.");
     await user.click(within(dialog).getByRole("checkbox", { name: "Ops" }));
     await user.click(within(dialog).getByRole("button", { name: /Zone creation/ }));
     await user.click(await screen.findByRole("option", { name: "Web" }));
@@ -59,6 +60,12 @@ describe("API keys", () => {
     expect(typeof body["expires_at"]).toBe("number");
   });
 
+  it("lists the server's API example", async () => {
+    renderApp("/api-keys");
+    await findHeading("API keys");
+    expect(screen.getByLabelText("Example request")).toHaveTextContent("/api/v1/servers/localhost/zones");
+  });
+
   it("offers roles only to admins", async () => {
     const { user, unmount } = renderApp("/api-keys");
     await findHeading("API keys");
@@ -66,7 +73,7 @@ describe("API keys", () => {
     let dialog = await screen.findByRole("dialog", { name: "Create API key" });
     await user.click(within(dialog).getByRole("button", { name: /Role/ }));
     await user.click(await screen.findByRole("option", { name: "Operator" }));
-    expect(within(dialog).queryByLabelText("Zones")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: "Zones" })).not.toBeInTheDocument();
     unmount();
 
     const second = renderApp("/api-keys", { me: userMe });
@@ -88,7 +95,7 @@ describe("API keys", () => {
     await screen.findByRole("table", { name: "API keys" });
     await user.click(screen.getByRole("button", { name: "Edit key ...abcd" }));
     const dialog = await screen.findByRole("dialog", { name: "Edit API key" });
-    expect(within(dialog).getByLabelText("Zones")).toHaveValue("example.com.");
+    expect(within(dialog).getByRole("row", { name: "example.com." })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Save key" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "Disable" }));

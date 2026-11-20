@@ -6,6 +6,7 @@ export { Card, CodeBlock, DetailList, FieldGrid, Mono, PageHeader, Stack, Toolba
 export { DocumentLink, Link, NavLink } from "./Link";
 export { Menu, MenuItem, MenuSection, MenuSeparator, MenuTrigger } from "./Menu";
 export { type ComboItem, CopyButton, Form, Pagination, QuickSearch, SearchField } from "./Misc";
+export { MultiPickerField } from "./Picker";
 export { RouterBridge } from "./RouterBridge";
 export { SelectField, type SelectOption } from "./Select";
 export { RowActions, RowHeader, Table, TBody, Td, THead, Th, Tr } from "./Table";

@@ -40,15 +40,14 @@ import {
   Table,
   TBody,
   Td,
-  TextAreaField,
   TextField,
   THead,
   Th,
   type Tone,
   Tr,
 } from "../../../components/ui";
-import { isHostname } from "../../../lib/dns";
-import { formatTime, joinList, splitList } from "../../../lib/format";
+import { ZonePickerField } from "../../../components/zone-picker";
+import { formatTime } from "../../../lib/format";
 import { useMe } from "../../../lib/me-context";
 
 export const Route = createFileRoute("/_app/admin/users")({
@@ -149,7 +148,7 @@ const editSchema = z.object({
   email: z.union([z.literal(""), z.email("Enter a valid email address.")]),
   role: z.enum(["admin", "operator", "user"]),
   status: z.enum(["active", "pending", "disabled"]),
-  zones: z.string().refine((v) => splitList(v).every((zone) => isHostname(zone)), "Enter one zone name per line."),
+  zones: z.array(z.string()),
   account_ids: z.array(z.string()),
 });
 type EditValues = z.infer<typeof editSchema>;
@@ -160,7 +159,7 @@ function toEditValues(user: User): EditValues {
     email: user.email,
     role: user.role,
     status: user.status,
-    zones: joinList(user.zones),
+    zones: user.zones,
     account_ids: user.account_ids.map(String),
   };
 }
@@ -192,7 +191,7 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
           email: values.email,
           role: values.role,
           status: values.status,
-          zones: splitList(values.zones).map((zone) => (zone.endsWith(".") ? zone : `${zone}.`)),
+          zones: values.zones,
           account_ids: values.account_ids.map(Number),
         },
       },
@@ -261,15 +260,11 @@ function EditUserDialog({ user, onClose }: { user: User | null; onClose: () => v
         <Controller
           control={form.control}
           name="zones"
-          render={({ field, fieldState }) => (
-            <TextAreaField
-              label="Zones"
-              description="One zone per line. Admins and Operators see every zone."
-              value={field.value}
+          render={({ field }) => (
+            <ZonePickerField
+              description="Admins and Operators see every zone."
+              value={field.value ?? []}
               onChange={field.onChange}
-              inputRef={field.ref}
-              errorMessage={fieldState.error?.message}
-              mono
             />
           )}
         />
