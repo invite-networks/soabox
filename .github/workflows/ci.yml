@@ -41,7 +41,7 @@ jobs:
           workspaces: backend
       - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
         with:
-          tool: cargo-nextest,cargo-llvm-cov
+          tool: cargo-nextest@0.9,cargo-llvm-cov@0.6
       - name: Start PowerDNS for the compatibility suite
         working-directory: .
         run: |
@@ -79,7 +79,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test:coverage
       - run: pnpm build
-      - run: pnpm audit --prod
+      - run: pnpm audit
       - name: API types match the backend OpenAPI spec
         run: node scripts/check-api-types.mjs ../backend/openapi.json
 
@@ -124,7 +124,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
       - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
         with:
-          tool: cargo-audit,cargo-deny
+          tool: cargo-audit@0.22.2,cargo-deny@0.19.8
       - run: cargo audit
       - run: cargo deny check
       - name: 72 hour release cooldown
@@ -147,3 +147,8 @@ jobs:
           build-args: SOABOX_GIT_SHA=${{ github.sha }}
       - name: Image runs as UID 1001
         run: test "$(docker image inspect soabox:ci --format '{{.Config.User}}')" = "1001:1001"
+      - name: Scan the image for vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.71.0 image --scanners vuln,secret,misconfig \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 soabox:ci

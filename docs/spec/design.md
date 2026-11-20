@@ -160,7 +160,7 @@ All variables use the `SOABOX_` prefix ([ADR-0011](../adr/0011-configuration-and
 
 See the [deployment diagram](../uml/deployment.md).
 
-- One container image built from a multi-stage Dockerfile. Distroless runtime, `USER 1001:1001`, version string from the crate version and short git SHA.
+- One container image built from a multi-stage Dockerfile with base images pinned by digest. The binary is statically linked against musl and runs on distroless `static`, which has no C library or OpenSSL, as `USER 1001:1001`. The version string comes from the crate version and short git SHA. CI scans the image with Trivy and fails on fixable High or Critical findings.
 - The image contains the binary and the built UI.
 - Persistent state in `data/` (SQLite database) or in Postgres.
 - `compose.yaml` at the repository root for development starts SOAbox and PowerDNS 5 with bind mounts under `data/`.
